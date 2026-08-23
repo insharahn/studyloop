@@ -1,7 +1,14 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-app = FastAPI(title="StudyLoop API", version="0.1.0")
+from contextlib import asynccontextmanager
+from app.ingestion.embedder import preload_model
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    preload_model()
+    yield
+
+app = FastAPI(title="StudyLoop API", version="0.1.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -10,7 +17,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
 
 @app.get("/health")
 def health():
