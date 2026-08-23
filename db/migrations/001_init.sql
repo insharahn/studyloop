@@ -45,7 +45,7 @@ create table chunks (
   chunk_index int not null,
   content text not null,
   token_count int,
-  embedding vector(768),
+  embedding vector(384),
   tsv tsvector generated always as (to_tsvector('english', content)) stored
 );
 
