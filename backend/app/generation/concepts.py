@@ -257,24 +257,43 @@ def _has_cycle(graph: dict[str, set[str]]) -> bool:
 
 
 def _write_to_db(course_id: str, concepts: list[dict], edges: list[tuple[str, str]]) -> tuple[int, int]:
+    """
+    Upserts concepts by (course_id, name) rather than delete-and-recreate --
+    preserves existing concept IDs across re-runs so cards attached to
+    them (cards.concept_id has ON DELETE CASCADE) are never silently
+    destroyed by regenerating the concept list.
+    """
     with pool.connection() as conn:
         with conn.transaction():
-            # Clear existing concepts for this course first -- makes
-            # build_concepts safe to re-run without accumulating duplicates.
-            # concept_edges cascades on delete via the FK.
-            conn.execute("delete from concepts where course_id = %s", (course_id,))
-
             name_to_id: dict[str, str] = {}
+            new_count = 0
+
             for c in concepts:
                 row = conn.execute(
                     """
                     insert into concepts (course_id, name, description, source_document_id, source_page)
                     values (%s, %s, %s, %s, %s)
-                    returning id
+                    on conflict (course_id, name)
+                    do update set
+                        description = excluded.description,
+                        source_document_id = excluded.source_document_id,
+                        source_page = excluded.source_page
+                    returning id, (xmax = 0) as was_inserted
                     """,
                     (course_id, c["name"], c["description"], c["source_document_id"], c["source_page"]),
                 ).fetchone()
                 name_to_id[c["name"]] = str(row[0])
+                if row[1]:
+                    new_count += 1
+
+            # Prerequisite edges: clear and rewrite ONLY the edges (not
+            # the concepts themselves) -- edges have no cards attached to
+            # them, so this is safe to fully replace on every run.
+            concept_ids = list(name_to_id.values())
+            conn.execute(
+                "delete from concept_edges where concept_id = any(%s)",
+                (concept_ids,),
+            )
 
             edges_created = 0
             for prereq_name, concept_name in edges:
