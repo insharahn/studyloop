@@ -10,6 +10,7 @@ from supabase import create_client, Client
 import os
 
 from app.deps import get_current_user
+from app.ingestion.pipeline import ingest
 
 router = APIRouter()
 
@@ -18,17 +19,6 @@ SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY")
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
 STORAGE_BUCKET = "documents"
-
-
-def _run_ingestion_placeholder(doc_id: str):
-    """
-    Placeholder background task. Insharah's real ingestion pipeline
-    (app/ingestion/pipeline.py) will replace/hook into this.
-    For now, this just exists so the endpoint has something to schedule.
-    """
-    # TODO: replace with call to Insharah's ingestion pipeline once available
-    pass
-
 
 @router.post("/documents/upload")
 async def upload_document(
@@ -67,7 +57,7 @@ async def upload_document(
     result = supabase.table("documents").insert(row).execute()
     doc = result.data[0]
 
-    background_tasks.add_task(_run_ingestion_placeholder, doc["id"])
+    background_tasks.add_task(ingest, doc["id"])
 
     return {"doc_id": doc["id"], "filename": doc["filename"], "status": "processing"}
 
