@@ -11,6 +11,7 @@ import os
 from app.deps import get_current_user
 from app.scheduling.fsrs_wrapper import init_card_state, advance_card_state
 from app.scheduling.planner import build_review_plan, order_cards_by_priority
+from app.scheduling.rootcause import find_root_cause
 
 router = APIRouter()
 
@@ -181,7 +182,7 @@ def review_submit(payload: dict, user_id: str = Depends(get_current_user)):
             "source": "review_fail",
             "card_id": card_id,
         }).execute()
-        # Root cause resolution happens in scheduling/rootcause.py (next task)
+        root_cause = find_root_cause(user_id, card["concept_id"], new_mastery)
 
     return {
         "correct": correct,
