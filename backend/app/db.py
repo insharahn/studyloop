@@ -14,7 +14,8 @@ pool = psycopg_pool.ConnectionPool(
         f"port={os.environ['DB_PORT']} "
         f"dbname={os.environ['DB_NAME']} "
         f"user={os.environ['DB_USER']} "
-        f"password={os.environ['DB_PASSWORD']}"
+        f"password={os.environ['DB_PASSWORD']} "
+        f"sslmode=require"
     ),
     min_size=1,
     max_size=5,
