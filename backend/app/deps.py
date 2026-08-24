@@ -8,7 +8,8 @@ from jose import jwt, JWTError
 import os
 
 SUPABASE_JWT_SECRET = os.environ.get("SUPABASE_JWT_SECRET")
-
+if not SUPABASE_JWT_SECRET:
+    raise RuntimeError("SUPABASE_JWT_SECRET is not set — check your .env file")
 
 def get_current_user(authorization: str = Header(...)) -> str:
     """
@@ -28,7 +29,7 @@ def get_current_user(authorization: str = Header(...)) -> str:
             algorithms=["HS256"],
             audience="authenticated",
         )
-    except JWTError:
+    except (JWTError, TypeError):
         raise HTTPException(status_code=401, detail="Invalid or expired token")
 
     user_id = payload.get("sub")
