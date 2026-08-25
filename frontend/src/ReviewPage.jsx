@@ -371,7 +371,7 @@ export function ReviewPage({ user, courseId, onNavigate }) {
                   onChange={(e) => setClozeInput(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && handleClozeSubmit()}
                   placeholder="Type your answer..."
-                  className="w-full rounded-2xl border-3 border-[#171717] p-3.5 text-sm font-bold text-[#171717] outline-none disabled:opacity-60"
+                  className="w-full rounded-2xl border-3 border-[#171717] bg-white p-3.5 text-sm font-bold text-[#171717] placeholder:text-gray-400 outline-none focus:bg-white focus:ring-4 focus:ring-amber-300 disabled:opacity-80"
                 />
                 {!submitted && (
                   <button

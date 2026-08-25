@@ -15,7 +15,7 @@ import gsap from "gsap";
 import { apiReview } from "./api";
 import { cn } from "./utils";
 
-export function ChatPage({ user, courseId, onNavigate }) {
+export function ChatPage({ user, courseId, initialPrompt, onNavigate }) {
   const [messages, setMessages] = useState([
     {
       id: "init",
@@ -36,11 +36,20 @@ export function ChatPage({ user, courseId, onNavigate }) {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
 
-  async function handleSend(e) {
-    e.preventDefault();
-    if (!input.trim() || loading) return;
+  const sentPromptRef = useRef(null);
 
-    const userMsg = { id: "u_" + Date.now(), role: "user", content: input };
+  // Auto-send initial prompt if navigated with a doubt question
+  useEffect(() => {
+    if (initialPrompt && initialPrompt.trim() && sentPromptRef.current !== initialPrompt) {
+      sentPromptRef.current = initialPrompt;
+      sendChatPrompt(initialPrompt);
+    }
+  }, [initialPrompt]);
+
+  async function sendChatPrompt(promptText) {
+    if (!promptText || !promptText.trim()) return;
+
+    const userMsg = { id: "u_" + Date.now(), role: "user", content: promptText };
     setMessages((prev) => [...prev, userMsg]);
     setInput("");
     setLoading(true);
@@ -48,7 +57,7 @@ export function ChatPage({ user, courseId, onNavigate }) {
     try {
       const res = await apiReview.sendChat({
         course_id: courseId,
-        message: userMsg.content,
+        message: promptText,
         session_id: sessionId
       });
       if (res.session_id) {
@@ -81,6 +90,12 @@ export function ChatPage({ user, courseId, onNavigate }) {
     }
   }
 
+  async function handleSend(e) {
+    e.preventDefault();
+    if (!input.trim() || loading) return;
+    await sendChatPrompt(input);
+  }
+
   return (
     <div className="flex h-screen flex-col bg-[#171717] text-white">
       {/* Top Bar */}
@@ -94,19 +109,8 @@ export function ChatPage({ user, courseId, onNavigate }) {
           </button>
           <div>
             <h2 className="font-display text-xl uppercase leading-none sm:text-2xl">Lecture Tutor</h2>
-            <span className="text-[10px] font-bold text-[#39d5c8] uppercase tracking-wider">
-              Confidence-Gated RAG
-            </span>
           </div>
         </div>
-
-        <button
-          onClick={() => setInput("Explain quantum physics in french")}
-          className="hidden sm:inline-flex items-center gap-1.5 rounded-full border-2 border-[#171717] bg-[#ffd356] px-3 py-1 text-[10px] font-black uppercase text-[#171717] shadow-sm hover:bg-amber-300"
-        >
-          <Sparkles className="h-3 w-3" />
-          Test Refusal Gate
-        </button>
       </header>
 
       {/* Message Stream */}
@@ -114,7 +118,7 @@ export function ChatPage({ user, courseId, onNavigate }) {
         {messages.map((m) => {
           const isUser = m.role === "user";
 
-          // Refusal Banner (grounded = false)
+          // Out of Syllabus Banner (grounded = false)
           if (!isUser && m.grounded === false) {
             return (
               <div
@@ -124,13 +128,10 @@ export function ChatPage({ user, courseId, onNavigate }) {
                 <div className="flex items-center gap-2 mb-1.5">
                   <ShieldAlert className="h-5 w-5 text-[#171717]" />
                   <span className="font-display text-lg uppercase tracking-tight">
-                    Not In Syllabus (Refusal Triggered)
+                    Not In Syllabus
                   </span>
                 </div>
                 <p className="text-xs font-bold leading-relaxed sm:text-sm">{m.content}</p>
-                <div className="mt-3 inline-block rounded-lg bg-black/10 px-2.5 py-1 text-[10px] font-black uppercase">
-                  Confidence Score: {Math.round((m.confidence || 0) * 100)}% (Below 35% Threshold)
-                </div>
               </div>
             );
           }

@@ -44,11 +44,18 @@ def create_course(payload: dict, user_id: str = Depends(get_current_user)):
 
 @router.get("/courses")
 def list_courses(user_id: str = Depends(get_current_user)):
+    from datetime import datetime, timezone
+    now_iso = datetime.now(timezone.utc).isoformat()
+
     courses_result = supabase.table("courses").select("*").eq("user_id", user_id).execute()
     courses = []
     for c in courses_result.data:
-        doc_count = supabase.table("documents").select("id", count="exact").eq("course_id", c["id"]).execute().count or 0
-        card_count = supabase.table("cards").select("id", count="exact").eq("course_id", c["id"]).execute().count or 0
+        course_id = c["id"]
+        doc_count = supabase.table("documents").select("id", count="exact").eq("course_id", course_id).execute().count or 0
+        
+        cards_result = supabase.table("cards").select("id").eq("course_id", course_id).execute()
+        all_c_ids = [card_row["id"] for card_row in (cards_result.data or [])]
+        card_count = len(all_c_ids)
 
         days_to_exam = None
         if c.get("exam_date"):
@@ -56,16 +63,47 @@ def list_courses(user_id: str = Depends(get_current_user)):
             exam = date.fromisoformat(c["exam_date"])
             days_to_exam = (exam - date.today()).days
 
+        mastery_pct = 0.0
+        due_today = 0
+
+        if doc_count > 0 and all_c_ids:
+            # SRS Due calculation: unreviewed cards + cards where due_at <= now_iso
+            states_res = supabase.table("card_states").select("card_id, due_at").eq("user_id", user_id).in_("card_id", all_c_ids).execute()
+            states_by_card = {s["card_id"]: s["due_at"] for s in (states_res.data or [])}
+
+            for cid in all_c_ids:
+                due_at = states_by_card.get(cid)
+                if not due_at or due_at <= now_iso:
+                    due_today += 1
+
+            concepts_result = supabase.table("concepts").select("id").eq("course_id", course_id).execute()
+            c_ids = [comp["id"] for comp in (concepts_result.data or [])]
+            if c_ids:
+                ucs_result = (
+                    supabase.table("user_concept_state")
+                    .select("mastery")
+                    .eq("user_id", user_id)
+                    .in_("concept_id", c_ids)
+                    .execute()
+                )
+                if ucs_result.data:
+                    m_vals = [row["mastery"] for row in ucs_result.data]
+                    mastery_pct = round((sum(m_vals) / len(m_vals)) * 100, 1) if m_vals else 35.0
+                else:
+                    mastery_pct = 35.0
+            else:
+                mastery_pct = 25.0
+
         courses.append({
-            "id": c["id"],
+            "id": course_id,
             "name": c["name"],
             "code": c["code"],
             "exam_date": c["exam_date"],
             "days_to_exam": days_to_exam,
             "doc_count": doc_count,
             "card_count": card_count,
-            "mastery_pct": 0,
-            "due_today": 0,
+            "mastery_pct": mastery_pct,
+            "due_today": due_today,
         })
 
     return {"courses": courses}

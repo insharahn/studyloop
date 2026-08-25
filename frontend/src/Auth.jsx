@@ -27,10 +27,10 @@ function GoogleIcon() {
   );
 }
 
-export function Auth({ onAuthSuccess, onClose }) {
+export function Auth({ onAuthSuccess, onClose, initialEmail = "" }) {
   // 'signin' | 'signup' | 'forgot'
-  const [mode, setMode] = useState("signin");
-  const [email, setEmail] = useState("");
+  const [mode, setMode] = useState(initialEmail ? "signup" : "signin");
+  const [email, setEmail] = useState(initialEmail || "");
   const [password, setPassword] = useState("");
   const [resetSent, setResetSent] = useState(false);
   const [error, setError] = useState("");
@@ -97,10 +97,10 @@ export function Auth({ onAuthSuccess, onClose }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-3 sm:p-4 backdrop-blur-sm select-none overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-3 sm:p-4 backdrop-blur-sm select-none overflow-y-auto no-scrollbar">
       <div
         ref={containerRef}
-        className="relative my-auto w-full max-w-md max-h-[92vh] overflow-y-auto rounded-[28px] border-4 border-[#171717] bg-[#ffd356] p-5 text-[#171717] shadow-hard sm:rounded-[32px] sm:p-8"
+        className="relative my-auto w-full max-w-md rounded-[28px] border-4 border-[#171717] bg-[#ffd356] p-5 text-[#171717] shadow-hard sm:rounded-[32px] sm:p-7 max-h-[92vh] overflow-y-auto no-scrollbar"
       >
         {/* Close Button */}
         {onClose && (
@@ -219,7 +219,7 @@ export function Auth({ onAuthSuccess, onClose }) {
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="student@studyloop.app"
+                  placeholder="studyloop@gmail.com"
                   className="w-full bg-transparent text-xs font-bold text-[#171717] outline-none sm:text-sm"
                 />
               </div>
