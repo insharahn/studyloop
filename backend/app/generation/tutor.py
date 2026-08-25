@@ -73,10 +73,12 @@ def answer_doubt(
     try:
         response = _client.chat.completions.create(
             model=TUTOR_MODEL,
-            max_tokens=600,
+            max_tokens=1000,
             messages=[{"role": "user", "content": prompt}],
         )
-        raw_answer = response.choices[0].message.content
+        choice = response.choices[0]
+        raw_answer = choice.message.content
+        was_truncated = choice.finish_reason == "length"
     except Exception as e:
         logger.error("Tutor LLM call failed: %s", e)
         return TutorAnswer(
@@ -85,6 +87,9 @@ def answer_doubt(
             confidence=confidence,
             citations=[],
         )
+
+    if was_truncated:
+        raw_answer = _trim_to_last_sentence(raw_answer) + "\n\n*(Answer was long and got cut short -- ask a follow-up if you need the rest.)*"
 
     clean_answer, citations = _extract_citations(raw_answer, chunks)
 
@@ -95,6 +100,18 @@ def answer_doubt(
         citations=citations,
     )
 
+def _trim_to_last_sentence(text: str) -> str:
+    """
+    Trims text back to the last complete sentence, so a truncated LLM
+    response ends cleanly (e.g. "...produces the final result.") rather
+    than mid-word or mid-list-item (e.g. "5. **Append-"). Falls back to
+    the original text if no sentence boundary is found at all.
+    """
+    matches = list(re.finditer(r"[.!?](?:\s|$)", text))
+    if not matches:
+        return text
+    last_end = matches[-1].end()
+    return text[:last_end].rstrip()
 
 def _build_prompt(query: str, chunks: list[RetrievedChunk]) -> str:
     lines = [

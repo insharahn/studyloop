@@ -40,6 +40,7 @@ export function ReviewPage({ user, courseId, onNavigate }) {
   const [sessionRootCauses, setSessionRootCauses] = useState([]);
   const [courseStats, setCourseStats] = useState(DEFAULT_STATS);
   const cardRef = useRef(null);
+  const [clozeInput, setClozeInput] = useState("");
 
   useEffect(() => {
     async function load() {
@@ -126,6 +127,42 @@ export function ReviewPage({ user, courseId, onNavigate }) {
     setSubmitted(true);
   }
 
+  async function handleClozeSubmit() {
+    if (submitted || !currentCard || !clozeInput.trim()) return;
+    const elapsed = Date.now() - startTime;
+
+    const cardAnswer = currentCard.answer || "";
+    const isCorrect = clozeInput.trim().toLowerCase() === cardAnswer.trim().toLowerCase();
+    const grade = isCorrect ? (elapsed < 5000 ? 4 : 3) : 1;
+
+    if (isCorrect) setSessionCorrectCount((prev) => prev + 1);
+
+    try {
+      const res = await apiReview.submitReview({
+        card_id: currentCard.card_id,
+        grade,
+        elapsed_ms: elapsed
+      });
+      if (res?.root_cause) {
+        setSessionRootCauses((prev) => {
+          const exists = prev.some((rc) => rc.concept_id === res.root_cause.concept_id);
+          return exists ? prev : [...prev, res.root_cause];
+        });
+      }
+      setReviewResult(res);
+    } catch (err) {
+      console.error("Failed to submit review:", err);
+      setReviewResult({
+        correct: isCorrect,
+        answer: cardAnswer,
+        explanation: isCorrect ? "Correct answer." : "Incorrect answer.",
+        next_due: new Date().toISOString(),
+        new_mastery: isCorrect ? 0.8 : 0.2
+      });
+    }
+    setSubmitted(true);
+  }
+
   function handleNext() {
     if (currentIndex + 1 < (queue?.cards?.length || 0)) {
       setCurrentIndex((prev) => prev + 1);
@@ -133,6 +170,7 @@ export function ReviewPage({ user, courseId, onNavigate }) {
       setSubmitted(false);
       setReviewResult(null);
       setStartTime(Date.now());
+      setClozeInput("");
     } else {
       setIsCompleted(true);
     }
@@ -323,41 +361,73 @@ export function ReviewPage({ user, courseId, onNavigate }) {
             </h2>
 
             {/* MCQ Options Grid */}
-            <div className="space-y-2.5 sm:space-y-3">
-              {currentCard.options?.map((opt, i) => {
-                const isSelected = selectedOption === i;
-                const targetAnswer = reviewResult?.answer || currentCard.answer || "";
-                const isCorrectOption = targetAnswer
-                  ? (opt.trim().toLowerCase() === targetAnswer.trim().toLowerCase() ||
-                     targetAnswer.toLowerCase().includes(opt.toLowerCase()) ||
-                     opt.toLowerCase().includes(targetAnswer.toLowerCase()))
-                  : isSelected && (reviewResult?.correct ?? true);
-
-                let optClass = "bg-white text-[#171717] hover:bg-amber-100";
-                if (submitted) {
-                  if (isCorrectOption) optClass = "bg-[#a7ef59] text-[#171717] border-black font-black";
-                  else if (isSelected && !isCorrectOption) optClass = "bg-[#ff6b6b] text-white";
-                  else optClass = "bg-white/40 text-black/50 opacity-60";
-                }
-
-                return (
+            {/* Answer Input Area */}
+            {currentCard.type === "cloze" ? (
+              <div className="space-y-3">
+                <input
+                  type="text"
+                  disabled={submitted}
+                  value={clozeInput}
+                  onChange={(e) => setClozeInput(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleClozeSubmit()}
+                  placeholder="Type your answer..."
+                  className="w-full rounded-2xl border-3 border-[#171717] p-3.5 text-sm font-bold text-[#171717] outline-none disabled:opacity-60"
+                />
+                {!submitted && (
                   <button
-                    key={i}
-                    disabled={submitted}
-                    onClick={() => handleOptionSelect(i)}
-                    className={cn(
-                      "w-full rounded-2xl border-3 border-[#171717] p-3.5 text-left text-xs sm:text-sm font-bold shadow-sm transition-all flex items-center justify-between",
-                      optClass
-                    )}
+                    onClick={handleClozeSubmit}
+                    disabled={!clozeInput.trim()}
+                    className="w-full rounded-xl border-2 border-[#171717] bg-[#a7ef59] px-4 py-2.5 text-xs font-black uppercase disabled:opacity-50"
                   >
-                    <span>{opt}</span>
-                    <span className="ml-2 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 border-[#171717] bg-white/70 text-[10px] font-black text-black">
-                      {["A", "B", "C", "D"][i]}
-                    </span>
+                    Submit Answer
                   </button>
-                );
-              })}
-            </div>
+                )}
+                {submitted && (
+                  <div className={cn(
+                    "rounded-2xl border-2 border-[#171717] p-3.5 text-sm font-bold",
+                    reviewResult?.correct ? "bg-[#a7ef59]" : "bg-[#ff6b6b] text-white"
+                  )}>
+                    Your answer: {clozeInput} — Correct answer: {reviewResult?.answer || currentCard.answer}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-2.5 sm:space-y-3">
+                {currentCard.options?.map((opt, i) => {
+                  const isSelected = selectedOption === i;
+                  const targetAnswer = reviewResult?.answer || currentCard.answer || "";
+                  const isCorrectOption = targetAnswer
+                    ? (opt.trim().toLowerCase() === targetAnswer.trim().toLowerCase() ||
+                      targetAnswer.toLowerCase().includes(opt.toLowerCase()) ||
+                      opt.toLowerCase().includes(targetAnswer.toLowerCase()))
+                    : isSelected && (reviewResult?.correct ?? true);
+
+                  let optClass = "bg-white text-[#171717] hover:bg-amber-100";
+                  if (submitted) {
+                    if (isCorrectOption) optClass = "bg-[#a7ef59] text-[#171717] border-black font-black";
+                    else if (isSelected && !isCorrectOption) optClass = "bg-[#ff6b6b] text-white";
+                    else optClass = "bg-white/40 text-black/50 opacity-60";
+                  }
+
+                  return (
+                    <button
+                      key={i}
+                      disabled={submitted}
+                      onClick={() => handleOptionSelect(i)}
+                      className={cn(
+                        "w-full rounded-2xl border-3 border-[#171717] p-3.5 text-left text-xs sm:text-sm font-bold shadow-sm transition-all flex items-center justify-between",
+                        optClass
+                      )}
+                    >
+                      <span>{opt}</span>
+                      <span className="ml-2 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 border-[#171717] bg-white/70 text-[10px] font-black text-black">
+                        {["A", "B", "C", "D"][i]}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
 
             {/* Signature Moment: Root-Cause DAG Callout */}
             {submitted && reviewResult?.root_cause && (
