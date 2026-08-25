@@ -39,13 +39,22 @@ def init_card_state() -> dict:
     }
 
 
-def advance_card_state(existing_state: dict, grade: int) -> dict:
+def advance_card_state(existing_state: dict, grade: int, review_datetime: datetime | None = None) -> dict:
     """
     Takes the current card_states row (as a dict) and a grade (1-4),
     advances it through FSRS, and returns the updated fields to persist.
+
+    review_datetime: when this review is happening. Defaults to now
+    (real production use). Verification/testing scripts can pass a
+    simulated datetime (e.g. the card's own due date) to accurately
+    exercise FSRS's interval growth, since FSRS bases growth on how
+    much time actually elapsed since the last review.
     """
     if grade not in _GRADE_TO_RATING:
         raise ValueError(f"Invalid grade: {grade}. Must be 1-4.")
+
+    if review_datetime is None:
+        review_datetime = datetime.now(timezone.utc)
 
     # Reconstruct an FSRS Card object from our stored state
     stored_state_name = existing_state.get("state", "Learning")
@@ -59,7 +68,7 @@ def advance_card_state(existing_state: dict, grade: int) -> dict:
     )
 
     rating = _GRADE_TO_RATING[grade]
-    updated_card, review_log = scheduler.review_card(card, rating)
+    updated_card, review_log = scheduler.review_card(card, rating, review_datetime=review_datetime)
 
     is_lapse = grade == 1
     new_lapses = existing_state.get("lapses", 0) + (1 if is_lapse else 0)
@@ -71,5 +80,5 @@ def advance_card_state(existing_state: dict, grade: int) -> dict:
         "reps": (existing_state.get("reps") or 0) + 1,
         "lapses": new_lapses,
         "state": _state_to_str(updated_card.state),
-        "last_review": updated_card.last_review.isoformat() if updated_card.last_review else datetime.now(timezone.utc).isoformat(),
+        "last_review": updated_card.last_review.isoformat() if updated_card.last_review else review_datetime.isoformat(),
     }
