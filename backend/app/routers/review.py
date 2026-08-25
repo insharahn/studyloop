@@ -79,7 +79,24 @@ def review_due(course_id: str, limit: int = 20, user_id: str = Depends(get_curre
     ordered = order_cards_by_priority(due_cards, days_to_exam)
     limited = ordered[:limit]
 
-    plan = build_review_plan(due_cards, days_to_exam, cards_remaining_total=len(due_cards))
+    # Real pace check: how many reviews has the user actually done today,
+    # used so plan.on_track reflects true behavior, not just self-consistent math.
+    today_str = datetime.now(timezone.utc).date().isoformat()
+    reviews_today_result = (
+        supabase.table("reviews")
+        .select("id", count="exact")
+        .eq("user_id", user_id)
+        .gte("reviewed_at", today_str)
+        .execute()
+    )
+    reviews_completed_today = reviews_today_result.count or 0
+
+    plan = build_review_plan(
+        due_cards,
+        days_to_exam,
+        cards_remaining_total=len(due_cards),
+        reviews_completed_today=reviews_completed_today,
+    )
 
     for c in limited:
         c.pop("due_at", None)
