@@ -8,7 +8,9 @@ from __future__ import annotations
 
 import logging
 import os
+import gc
 import tempfile
+
 from pathlib import Path
 
 from supabase import create_client, Client
@@ -51,6 +53,7 @@ async def ingest(document_id: str) -> None:
         _update_status(document_id, status="processing", progress=40)
 
         vectors = embed_documents([c.content for c in chunks])
+        gc.collect()
         _update_status(document_id, status="processing", progress=80)
 
         _write_chunks(document_id, course_id, chunks, vectors)

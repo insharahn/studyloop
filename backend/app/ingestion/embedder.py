@@ -77,7 +77,7 @@ def embed_batch(texts: list[str], task_type: TaskType) -> list[list[float]]:
     try:
         embeddings = model.encode(
             texts,
-            batch_size=32,
+            batch_size=8,
             show_progress_bar=False,
             convert_to_numpy=True,
             normalize_embeddings=True,
