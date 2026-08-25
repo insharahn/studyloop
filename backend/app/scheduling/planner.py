@@ -37,16 +37,24 @@ def compute_priority(due_at_iso: str, mastery: float, days_to_exam: int | None) 
     return urgency * weakness * exam_pressure
 
 
-def build_review_plan(cards_with_state: list[dict], days_to_exam: int | None, cards_remaining_total: int) -> dict:
+def build_review_plan(
+    cards_with_state: list[dict],
+    days_to_exam: int | None,
+    cards_remaining_total: int,
+    reviews_completed_today: int = 0,
+) -> dict:
     """
     cards_with_state: list of dicts, each with at least
         { 'due_at': iso str, 'mastery': float, ... }
+    reviews_completed_today: how many reviews the user has actually
+        submitted today. Used so on_track reflects real pace instead of
+        just re-checking the same numbers used to derive cards_today.
     Returns the plan object per docs/API.md:
         { days_to_exam, cards_today, cards_remaining_total, on_track }
     """
     if days_to_exam is not None and days_to_exam > 0:
         cards_today = max(-(-cards_remaining_total // days_to_exam), 10)  # ceil division, floor of 10
-        on_track = cards_remaining_total <= cards_today * days_to_exam
+        on_track = reviews_completed_today >= cards_today
     else:
         cards_today = max(cards_remaining_total, 10) if cards_remaining_total else 10
         on_track = True  # no exam date means no deadline pressure

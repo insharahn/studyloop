@@ -20,7 +20,7 @@ if not SUPABASE_URL:
 JWKS_URL = f"{SUPABASE_URL}/auth/v1/.well-known/jwks.json"
 JWKS_CACHE_TTL_SECONDS = 3600
 
-_bearer_scheme = HTTPBearer()
+_bearer_scheme = HTTPBearer(auto_error=False)
 
 _jwks_cache: dict | None = None
 _jwks_cache_time: float = 0.0
@@ -39,13 +39,16 @@ def _get_jwks() -> dict:
     return _jwks_cache
 
 
-def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(_bearer_scheme)) -> str:
+def get_current_user(credentials: HTTPAuthorizationCredentials | None = Depends(_bearer_scheme)) -> str:
     """
     Verifies the Supabase JWT from the Authorization: Bearer <token>
     header using Supabase's public key (ES256), and returns the user id
     (the 'sub' claim). Raises 401 if the token is missing, malformed,
     invalid, or signed with a key not found in Supabase's JWKS.
     """
+    if credentials is None:
+        raise HTTPException(status_code=401, detail="Missing Authorization header")
+
     token = credentials.credentials
 
     try:
