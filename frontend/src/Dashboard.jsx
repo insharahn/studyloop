@@ -22,9 +22,23 @@ import { cn } from "./utils";
 import { SkeletonBlock, EmptyState } from "./States";
 
 export function Dashboard({ user, onNavigate }) {
-  const [courses, setCourses] = useState([]);
+  const [courses, setCourses] = useState(() => {
+    try {
+      const cached = localStorage.getItem("studyloop_cached_courses");
+      return cached ? JSON.parse(cached) : [];
+    } catch {
+      return [];
+    }
+  });
   const [stats, setStats] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => {
+    try {
+      const cached = localStorage.getItem("studyloop_cached_courses");
+      return !cached || JSON.parse(cached).length === 0;
+    } catch {
+      return true;
+    }
+  });
   const [showAddModal, setShowAddModal] = useState(false);
   const [newCourseName, setNewCourseName] = useState("");
   const [newCourseCode, setNewCourseCode] = useState("");
@@ -33,15 +47,26 @@ export function Dashboard({ user, onNavigate }) {
   async function handleDeleteCourse(courseId, e) {
     e.stopPropagation();
     await api.deleteCourse(courseId);
-    setCourses((prev) => prev.filter((c) => c.id !== courseId));
+    setCourses((prev) => {
+      const updated = prev.filter((c) => c.id !== courseId);
+      try {
+        localStorage.setItem("studyloop_cached_courses", JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
   }
 
   useEffect(() => {
     async function loadCourses() {
-      setLoading(true);
+      if (!courses || courses.length === 0) {
+        setLoading(true);
+      }
       try {
         const fetchedCourses = await api.getCourses();
         setCourses(fetchedCourses);
+        try {
+          localStorage.setItem("studyloop_cached_courses", JSON.stringify(fetchedCourses));
+        } catch {}
 
         if (fetchedCourses?.[0]?.id) {
           const fetchedStats = await apiStats.getStats(fetchedCourses[0].id);
@@ -49,7 +74,6 @@ export function Dashboard({ user, onNavigate }) {
         }
       } catch (err) {
         console.error("Failed to load dashboard data:", err);
-        setCourses([]);
       } finally {
         setLoading(false);
       }
@@ -58,9 +82,18 @@ export function Dashboard({ user, onNavigate }) {
   }, []);
 
   const totalDueToday = courses.reduce((acc, c) => acc + (c.due_today || 0), 0);
-  const averageMastery = Math.round(
-    (courses.reduce((acc, c) => acc + (c.mastery_pct || 0), 0) / (courses.length || 1)) * 100
-  );
+  
+  const activeCoursesWithDocs = courses.filter((c) => (c.doc_count || 0) > 0);
+  const coursesToAvg = activeCoursesWithDocs.length > 0 ? activeCoursesWithDocs : courses;
+  const averageMastery = coursesToAvg.length > 0
+    ? Math.round(
+        coursesToAvg.reduce((acc, c) => {
+          const raw = typeof c.mastery_pct === "number" ? c.mastery_pct : 0;
+          const pct = raw > 1 ? raw : raw * 100;
+          return acc + pct;
+        }, 0) / coursesToAvg.length
+      )
+    : 0;
 
   async function handleCreateCourse(e) {
     e.preventDefault();
@@ -80,7 +113,13 @@ export function Dashboard({ user, onNavigate }) {
       mastery_pct: 0
     };
 
-    setCourses((prev) => [...prev, newCourseObj]);
+    setCourses((prev) => {
+      const updated = [...prev, newCourseObj];
+      try {
+        localStorage.setItem("studyloop_cached_courses", JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
     setShowAddModal(false);
     setNewCourseName("");
     setNewCourseCode("");
@@ -91,7 +130,7 @@ export function Dashboard({ user, onNavigate }) {
     <div className="min-h-screen bg-[#171717] px-4 pb-20 pt-6 text-white sm:px-8 lg:px-12">
       <div className="mx-auto max-w-6xl">
         {/* Top Navbar */}
-        <header className="mb-8 flex flex-col justify-between gap-4 border-b-2 border-white/10 pb-6 sm:flex-row sm:items-center">
+        <header className="mb-8 flex flex-row items-center justify-between gap-3 border-b-2 border-white/10 pb-6">
           <div>
             <span className="brand-mark text-xl font-black uppercase text-white">StudyLoop</span>
             <p className="mt-1 text-xs font-bold text-white/60">
@@ -99,28 +138,30 @@ export function Dashboard({ user, onNavigate }) {
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2.5">
+          <div className="flex items-center gap-2 shrink-0">
             <button
               onClick={() => onNavigate("upload")}
-              className="flex items-center gap-1.5 rounded-xl border-2 border-[#171717] bg-[#39d5c8] px-4 py-2 text-xs font-black uppercase text-[#171717] shadow-hard transition hover:-translate-y-0.5"
+              className="flex h-9 items-center justify-center gap-1.5 rounded-xl border-2 border-[#171717] bg-[#39d5c8] px-3 sm:px-4 text-xs font-black uppercase text-[#171717] shadow-hard transition hover:-translate-y-0.5"
+              title="Upload PDF"
             >
-              <UploadCloud className="h-4 w-4" />
-              Upload PDF
+              <UploadCloud className="h-4 w-4 shrink-0" />
+              <span className="hidden sm:inline">Upload PDF</span>
             </button>
             <button
               onClick={() => setShowAddModal(true)}
-              className="flex items-center gap-1.5 rounded-xl border-2 border-white bg-white/10 px-4 py-2 text-xs font-black uppercase text-white backdrop-blur transition hover:bg-white hover:text-[#171717]"
+              className="flex h-9 items-center justify-center gap-1.5 rounded-xl border-2 border-white bg-white/10 px-3 sm:px-4 text-xs font-black uppercase text-white backdrop-blur transition hover:bg-white hover:text-[#171717]"
+              title="Add Course"
             >
-              <Plus className="h-4 w-4" />
-              Add Course
+              <Plus className="h-4 w-4 shrink-0" />
+              <span className="hidden sm:inline">Add Course</span>
             </button>
             <button
               onClick={() => onNavigate("logout")}
-              className="flex items-center gap-1.5 rounded-xl border-2 border-white/30 bg-white/10 px-3.5 py-2 text-xs font-black uppercase text-white transition hover:bg-rose-500 hover:border-rose-600 hover:text-white"
+              className="flex h-9 items-center justify-center gap-1.5 rounded-xl border-2 border-white/30 bg-white/10 px-3 sm:px-3.5 text-xs font-black uppercase text-white transition hover:bg-rose-500 hover:border-rose-600 hover:text-white"
               title="Sign Out"
             >
-              <LogOut className="h-4 w-4" />
-              Sign Out
+              <LogOut className="h-4 w-4 shrink-0" />
+              <span className="hidden sm:inline">Sign Out</span>
             </button>
           </div>
         </header>
@@ -258,7 +299,7 @@ export function Dashboard({ user, onNavigate }) {
                     <div className="h-2.5 w-full overflow-hidden rounded-full border-2 border-[#171717] bg-white/40">
                       <div
                         className="h-full bg-[#171717] transition-all duration-500"
-                        style={{ width: `${masteryPercent}%` }}
+                        style={{ width: `${Math.max(masteryPercent, docCount > 0 ? 6 : 0)}%` }}
                       />
                     </div>
                   </div>
@@ -279,7 +320,7 @@ export function Dashboard({ user, onNavigate }) {
                     <div className="mt-6 flex flex-wrap gap-2 border-t-2 border-black/10 pt-4">
                       <button
                         onClick={() => onNavigate("review", course.id)}
-                        className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border-2 border-[#171717] bg-white px-3 py-2 text-xs font-black uppercase text-[#171717] shadow-sm transition hover:bg-black hover:text-white"
+                        className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border-2 border-[#171717] bg-[#a7ef59] px-3 py-2 text-xs font-black uppercase text-[#171717] shadow-sm transition hover:bg-lime-300"
                       >
                         <RotateCcw className="h-3.5 w-3.5" />
                         Practice ({dueToday})

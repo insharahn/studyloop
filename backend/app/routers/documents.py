@@ -5,6 +5,7 @@ and schedules ingestion as a background task.
 """
 
 import hashlib
+import uuid
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, Form, BackgroundTasks
 from supabase import create_client, Client
 import os
@@ -20,6 +21,15 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
 STORAGE_BUCKET = "documents"
 
+
+def _is_uuid(val: str) -> bool:
+    try:
+        uuid.UUID(str(val))
+        return True
+    except (ValueError, TypeError, AttributeError):
+        return False
+
+
 @router.post("/documents/upload")
 async def upload_document(
     background_tasks: BackgroundTasks,
@@ -27,6 +37,9 @@ async def upload_document(
     course_id: str = Form(...),
     user_id: str = Depends(get_current_user),
 ):
+    if not _is_uuid(course_id):
+        raise HTTPException(status_code=404, detail="Course not found")
+
     # Confirm the course belongs to this user
     course = supabase.table("courses").select("id").eq("id", course_id).eq("user_id", user_id).execute()
     if not course.data:
@@ -64,6 +77,8 @@ async def upload_document(
 
 @router.get("/documents/{doc_id}/status")
 def document_status(doc_id: str, user_id: str = Depends(get_current_user)):
+    if not _is_uuid(doc_id):
+        raise HTTPException(status_code=404, detail="Document not found")
     result = supabase.table("documents").select("*").eq("id", doc_id).execute()
     if not result.data:
         raise HTTPException(status_code=404, detail="Document not found")
@@ -80,6 +95,8 @@ def document_status(doc_id: str, user_id: str = Depends(get_current_user)):
 
 @router.get("/courses/{course_id}/documents")
 def list_course_documents(course_id: str, user_id: str = Depends(get_current_user)):
+    if not _is_uuid(course_id):
+        raise HTTPException(status_code=404, detail="Course not found")
     course = supabase.table("courses").select("id").eq("id", course_id).eq("user_id", user_id).execute()
     if not course.data:
         raise HTTPException(status_code=404, detail="Course not found")
@@ -102,10 +119,18 @@ def list_course_documents(course_id: str, user_id: str = Depends(get_current_use
 
 @router.delete("/documents/{doc_id}")
 def delete_document(doc_id: str, user_id: str = Depends(get_current_user)):
+    if not _is_uuid(doc_id):
+        raise HTTPException(status_code=404, detail="Document not found")
     doc = supabase.table("documents").select("storage_path").eq("id", doc_id).execute()
     if not doc.data:
         raise HTTPException(status_code=404, detail="Document not found")
 
-    supabase.storage.from_(STORAGE_BUCKET).remove([doc.data[0]["storage_path"]])
+    storage_path = doc.data[0].get("storage_path")
+    if storage_path:
+        try:
+            supabase.storage.from_(STORAGE_BUCKET).remove([storage_path])
+        except Exception:
+            pass
+
     supabase.table("documents").delete().eq("id", doc_id).execute()
     return {"deleted": True}

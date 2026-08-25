@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { LandingPage } from "./LandingPage";
+import { AboutPage } from "./AboutPage";
 import { Auth } from "./Auth";
 import { Dashboard } from "./Dashboard";
 import { UploadPage } from "./UploadPage";
@@ -13,13 +14,11 @@ export default function App() {
   const [user, setUser] = useState(null);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [currentView, setCurrentView] = useState("landing"); // 'landing' | 'dashboard' | 'upload' | 'chat' | 'review' | 'concepts' | 'pulse'
-  const [activeCourseId, setActiveCourseId] = useState("c1");
+  const [activeCourseId, setActiveCourseId] = useState(null);
+  const [initialChatPrompt, setInitialChatPrompt] = useState(null);
   const [restoringSession, setRestoringSession] = useState(true);
 
-  // Runs once on load: (1) if we just landed back from the Google OAuth
-  // redirect, pick the session tokens out of the URL hash; (2) either
-  // way, if a token is already stored, restore the session so a page
-  // refresh doesn't silently log the user out.
+  // Runs once on load
   useEffect(() => {
     (async () => {
       const redirected = consumeOAuthRedirect();
@@ -35,14 +34,10 @@ export default function App() {
 
       const cachedUser = getStoredUser();
       if (cachedUser) {
-        // Show the cached user immediately, then confirm the token is
-        // still actually valid in the background.
         setUser(cachedUser);
         setCurrentView("dashboard");
         const confirmedUser = await fetchCurrentUser();
         if (!confirmedUser) {
-          // Token had expired/was invalid -- back to signed-out state
-          // rather than a dashboard full of an expired session's data.
           setUser(null);
           setCurrentView("landing");
         }
@@ -57,7 +52,7 @@ export default function App() {
     setCurrentView("dashboard");
   }
 
-  function handleNavigate(targetView, courseId = null) {
+  function handleNavigate(targetView, courseId = null, extraData = null) {
     if (targetView === "logout") {
       auth.signOut();
       setUser(null);
@@ -65,7 +60,19 @@ export default function App() {
       return;
     }
     if (courseId) setActiveCourseId(courseId);
+    if (extraData && extraData.prompt) {
+      setInitialChatPrompt(extraData.prompt);
+    } else {
+      setInitialChatPrompt(null);
+    }
     setCurrentView(targetView);
+  }
+
+  const [initialAuthEmail, setInitialAuthEmail] = useState("");
+
+  function handleOpenAuth(prefilledEmail = "") {
+    setInitialAuthEmail(typeof prefilledEmail === "string" ? prefilledEmail : "");
+    setShowAuthModal(true);
   }
 
   if (restoringSession) {
@@ -75,11 +82,16 @@ export default function App() {
   return (
     <div>
       {currentView === "landing" && (
-        <LandingPage onOpenAuth={() => setShowAuthModal(true)} />
+        <LandingPage onOpenAuth={handleOpenAuth} onNavigate={handleNavigate} />
+      )}
+
+      {currentView === "about" && (
+        <AboutPage onNavigate={handleNavigate} onOpenAuth={handleOpenAuth} />
       )}
 
       {showAuthModal && (
         <Auth
+          initialEmail={initialAuthEmail}
           onAuthSuccess={handleAuthSuccess}
           onClose={() => setShowAuthModal(false)}
         />
@@ -101,6 +113,7 @@ export default function App() {
         <ChatPage
           user={user}
           courseId={activeCourseId}
+          initialPrompt={initialChatPrompt}
           onNavigate={handleNavigate}
         />
       )}

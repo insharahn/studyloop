@@ -3,7 +3,9 @@ import {
   ArrowRight,
   FileText,
   MessageSquareText,
-  RotateCcw
+  RotateCcw,
+  Instagram,
+  Linkedin
 } from "lucide-react";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
@@ -15,23 +17,23 @@ const programs = [
   {
     step: "01",
     title: "Upload Course Material",
-    copy: "Drag and drop your PDFs, lecture decks, and readings. StudyLoop extracts and chunks text while strictly preserving slide numbers and page provenance.",
+    copy: "Drag and drop your PDFs, lecture slides, and notes. StudyLoop organizes your materials while keeping every page number and slide reference exact.",
     className: "bg-lemon",
     icon: FileText,
     visual: "upload"
   },
   {
     step: "02",
-    title: "Ask Doubts With Exact Citations",
-    copy: "Query your materials and receive answers sourced solely from your files. If a concept isn't in your notes, StudyLoop refuses to hallucinate and tells you directly.",
+    title: "Ask Doubts With Page Citations",
+    copy: "Ask any question and get clear answers sourced strictly from your uploaded files. If a concept isn't in your notes, StudyLoop tells you directly instead of making things up.",
     className: "bg-iris text-white",
     icon: MessageSquareText,
     visual: "ask"
   },
   {
     step: "03",
-    title: "Master Weak Prerequisites",
-    copy: "When you miss an auto-generated practice question, the root-cause engine identifies the underlying prerequisite topic you need to revisit before exam day.",
+    title: "Fix Foundation Gaps",
+    copy: "When you miss a practice question, StudyLoop traces back to the basic concept you need to review first so you're 100% ready for exam day.",
     className: "bg-berry",
     icon: RotateCcw,
     visual: "loop"
@@ -41,37 +43,37 @@ const programs = [
 const programTabs = [
   {
     id: "confidence-tutor",
-    label: "Confidence Tutor",
+    label: "Accurate AI Tutor",
     color: "bg-[#ffd356]",
     textColor: "text-[#171717]",
     badgeColor: "bg-[#ff8b67]",
-    badgeText: "NO HALLUCINATIONS",
-    headline: "CONFIDENCE-GATED TUTOR.",
-    tagline: "No hallucinations. Zero guesswork.",
+    badgeText: "NO MADE-UP FACTS",
+    headline: "STRICT ACCURACY AI TUTOR.",
+    tagline: "No fake facts. Zero guesswork.",
     description:
-      "If a topic isn't in your lecture slides, StudyLoop explicitly refuses to answer rather than fabricating facts. Every single answer cites the exact slide and page number.",
+      "If a topic isn't in your lecture slides, StudyLoop explicitly refuses to answer rather than fabricating information. Every single response links back to the exact page and slide number.",
     cards: [
       {
-        title: "Exact Citations",
-        subtitle: "Every answer links to a real slide & page",
+        title: "Exact Page Links",
+        subtitle: "Every answer links directly to a real slide & page",
         bg: "bg-[#e0f7fa]",
         asset: "/hero-assets/1.png"
       },
       {
-        title: "Strict Refusal",
-        subtitle: "Calmly declines out-of-syllabus prompts",
+        title: "Syllabus Boundary",
+        subtitle: "Declines questions outside your course material",
         bg: "bg-[#ffecb3]",
         asset: "/hero-assets/2.png"
       },
       {
-        title: "Context Snippets",
-        subtitle: "Click to preview the raw source excerpt",
+        title: "Slide Excerpts",
+        subtitle: "Click to preview the raw text from your notes",
         bg: "bg-[#ffcdd2]",
         asset: "/hero-assets/3.png"
       },
       {
-        title: "Hybrid Search",
-        subtitle: "Dense embeddings fused with lexical FTS",
+        title: "Smart Notes Search",
+        subtitle: "Finds matching ideas even if you use different words",
         bg: "bg-[#e1bee7]",
         asset: "/hero-assets/6.png"
       }
@@ -79,37 +81,37 @@ const programTabs = [
   },
   {
     id: "root-cause",
-    label: "Root-Cause Tracing",
+    label: "Foundation Tracing",
     color: "bg-[#6574ff]",
     textColor: "text-white",
     badgeColor: "bg-[#ffd356]",
-    badgeText: "DAG TRACING",
-    headline: "ROOT-CAUSE PREREQUISITE TRACING.",
-    tagline: "Fix why you got it wrong.",
+    badgeText: "SMART CONCEPT MAP",
+    headline: "ROOT-CAUSE CONCEPT MAP.",
+    tagline: "Fix why you got a question wrong.",
     description:
-      "Missing an advanced question usually stems from an earlier gap. StudyLoop traverses your course prerequisite DAG to pinpoint the exact foundational concept that caused the error.",
+      "Struggling with a difficult topic usually happens because an earlier basic concept wasn't clear. StudyLoop maps topic prerequisites so you can quickly strengthen your weak spots.",
     cards: [
       {
-        title: "Prerequisite DAG",
-        subtitle: "Infers acyclic dependencies across concepts",
+        title: "Interactive Concept Map",
+        subtitle: "Visual map showing how topics build on each other",
         bg: "bg-[#e0f7fa]",
         asset: "/hero-assets/7.png"
       },
       {
-        title: "Root Cause Callout",
-        subtitle: "Identifies the failed base topic on review",
+        title: "Prerequisite Callout",
+        subtitle: "Highlights the foundational concept to review",
         bg: "bg-[#ffecb3]",
         asset: "/hero-assets/4.png"
       },
       {
-        title: "Automatic Gap Log",
-        subtitle: "Records doubt topics directly into user state",
+        title: "Weak Topic Tracker",
+        subtitle: "Saves topics you found tricky for quick revision",
         bg: "bg-[#ffcdd2]",
         asset: "/hero-assets/1.png"
       },
       {
-        title: "Mastery Recalibration",
-        subtitle: "Dynamic EMA scoring weighted to history",
+        title: "Mastery Progress",
+        subtitle: "Updates your score as you practice and improve",
         bg: "bg-[#e1bee7]",
         asset: "/hero-assets/5.png"
       }
@@ -117,37 +119,37 @@ const programTabs = [
   },
   {
     id: "exam-schedule",
-    label: "Exam Scheduling",
+    label: "Exam Planner",
     color: "bg-[#ff57ce]",
     textColor: "text-white",
     badgeColor: "bg-[#39d5c8]",
-    badgeText: "FSRS COMPRESSED",
-    headline: "EXAM-DATE-AWARE SCHEDULING.",
-    tagline: "Spaced repetition on a real deadline.",
+    badgeText: "EXAM DEADLINE READY",
+    headline: "EXAM-DATE-AWARE REVISION.",
+    tagline: "Spaced practice built around your exam date.",
     description:
-      "Standard spaced repetition algorithms assume an infinite timeline. StudyLoop compresses and prioritizes your daily review queue based on your actual midterm or final exam date.",
+      "Ordinary flashcard apps assume you have endless time. StudyLoop automatically organizes your daily practice cards so you finish reviewing everything before your midterm or final exam.",
     cards: [
       {
-        title: "FSRS Engine",
-        subtitle: "Calculates stability, difficulty, and recall",
+        title: "Memory Tracker",
+        subtitle: "Calculates when you are about to forget a card",
         bg: "bg-[#e0f7fa]",
         asset: "/hero-assets/3.png"
       },
       {
         title: "Deadline Planner",
-        subtitle: "Compresses cards per day to clear queue",
+        subtitle: "Adjusts daily practice count based on days remaining",
         bg: "bg-[#ffecb3]",
         asset: "/hero-assets/2.png"
       },
       {
-        title: "Urgency Multiplier",
-        subtitle: "Weights review order by remaining days",
+        title: "Urgency Boost",
+        subtitle: "Prioritizes urgent topics as exam day gets closer",
         bg: "bg-[#ffcdd2]",
         asset: "/hero-assets/6.png"
       },
       {
         title: "Pace Indicator",
-        subtitle: "Real-time badge showing if you're on track",
+        subtitle: "Clear badge showing if you're on track to finish",
         bg: "bg-[#e1bee7]",
         asset: "/hero-assets/7.png"
       }
@@ -159,33 +161,33 @@ const programTabs = [
     color: "bg-[#39d5c8]",
     textColor: "text-[#171717]",
     badgeColor: "bg-[#ff8b67]",
-    badgeText: "ANONYMOUS",
-    headline: "ANONYMOUS CLASS PULSE.",
-    tagline: "Know if it's just you or the topic.",
+    badgeText: "100% ANONYMOUS",
+    headline: "ANONYMOUS CLASS HEATMAP.",
+    tagline: "See which topics your class finds tricky.",
     description:
-      "View an anonymized cohort heatmap showing where your peers are stuck, giving you instant insight into the hardest concepts in the syllabus without compromising student privacy.",
+      "View an anonymous class heatmap to see which concepts are hardest for your peers. Know whether a topic is genuinely difficult for everyone without sacrificing anyone's privacy.",
     cards: [
       {
-        title: "Cohort Heatmap",
-        subtitle: "Aggregated difficulty rankings across peers",
+        title: "Class Difficulty Map",
+        subtitle: "Shows the hardest topics across your classmate group",
         bg: "bg-[#e0f7fa]",
         asset: "/hero-assets/8.png"
       },
       {
-        title: "3+ User Privacy Gate",
-        subtitle: "Completely hides stats if sample is too small",
+        title: "Privacy Protection",
+        subtitle: "Keeps all student stats completely anonymous",
         bg: "bg-[#ffecb3]",
         asset: "/hero-assets/4.png"
       },
       {
-        title: "Relative Standing",
-        subtitle: "Compare your mastery tier to cohort average",
+        title: "Class Comparison",
+        subtitle: "See how your progress compares to class average",
         bg: "bg-[#ffcdd2]",
         asset: "/hero-assets/5.png"
       },
       {
-        title: "Hard Topic Radar",
-        subtitle: "Reveals the top friction points in lectures",
+        title: "Hard Topic Spotlight",
+        subtitle: "Highlights lecture topics that need extra attention",
         bg: "bg-[#e1bee7]",
         asset: "/hero-assets/9.png"
       }
@@ -246,7 +248,7 @@ function ProgramVisual({ type }) {
   );
 }
 
-export function LandingPage({ onOpenAuth }) {
+export function LandingPage({ onOpenAuth, onNavigate }) {
   const rootRef = useRef(null);
   const [activeTab, setActiveTab] = useState(0);
   const [email, setEmail] = useState("");
@@ -500,8 +502,11 @@ export function LandingPage({ onOpenAuth }) {
 
   function handleSubmit(event) {
     event.preventDefault();
-    if (!email.trim()) return;
-    setSubmitted(true);
+    if (onOpenAuth) {
+      onOpenAuth(email.trim());
+    } else {
+      setSubmitted(true);
+    }
   }
 
   return (
@@ -518,24 +523,64 @@ export function LandingPage({ onOpenAuth }) {
           <a className="brand-mark justify-self-start font-black uppercase tracking-normal text-white sm:justify-self-center" href="#">
             StudyLoop
           </a>
-          <a className="hidden justify-self-center transition hover:text-white sm:block" href="#waitlist">
-            About Us
-          </a>
           <a
-            className="contact-ring justify-self-end rounded-full px-4 py-2.5 text-[10px] font-semibold text-white/80 transition hover:text-white sm:px-5 sm:py-3"
-            href="#waitlist"
+            className="hidden justify-self-center transition hover:text-white sm:block cursor-pointer"
+            href="#about"
             onClick={(e) => {
-              if (onOpenAuth) {
-                e.preventDefault();
-                onOpenAuth();
-              }
+              e.preventDefault();
+              if (onNavigate) onNavigate("about");
             }}
           >
-            Contact Us
+            About Us
           </a>
+          <div className="relative justify-self-end flex items-center justify-center">
+            {/* Gray Arrows pointing towards Join Us circle */}
+            <svg
+              className="pointer-events-none absolute -inset-7 h-[calc(100%+56px)] w-[calc(100%+56px)] text-white/40 z-10 overflow-visible"
+              viewBox="0 0 200 100"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              {/* Arrow 1: Top-Left pointing down-right */}
+              <path d="M 15 10 Q 40 20 60 32" strokeDasharray="4 3" />
+              <path d="M 48 32 L 60 32 L 58 20" />
+
+              {/* Arrow 2: Bottom-Left pointing up-right */}
+              <path d="M 20 90 Q 45 75 62 60" strokeDasharray="4 3" />
+              <path d="M 52 61 L 62 60 L 60 70" />
+
+              {/* Arrow 3: Bottom pointing straight up */}
+              <path d="M 100 98 Q 100 80 100 66" strokeDasharray="4 3" />
+              <path d="M 93 74 L 100 66 L 107 74" />
+
+              {/* Arrow 4: Bottom-Right pointing up-left */}
+              <path d="M 180 90 Q 155 75 138 60" strokeDasharray="4 3" />
+              <path d="M 140 70 L 138 60 L 148 61" />
+
+              {/* Arrow 5: Top-Right pointing down-left */}
+              <path d="M 185 10 Q 160 20 140 32" strokeDasharray="4 3" />
+              <path d="M 142 20 L 140 32 L 152 32" />
+            </svg>
+
+            <a
+              className="contact-ring relative z-20 rounded-full px-4 py-2.5 text-[10px] font-semibold text-white/80 transition hover:text-white sm:px-5 sm:py-3"
+              href="#waitlist"
+              onClick={(e) => {
+                if (onOpenAuth) {
+                  e.preventDefault();
+                  onOpenAuth();
+                }
+              }}
+            >
+              Join Us
+            </a>
+          </div>
         </nav>
 
-        <div className="hero-poster relative z-10 mx-auto flex min-h-[calc(100vh-96px)] max-w-5xl items-center justify-center py-10 sm:py-16">
+        <div className="hero-poster relative z-10 mx-auto flex min-h-0 sm:min-h-[calc(100vh-96px)] max-w-5xl items-center justify-center py-6 sm:py-16">
           <img className="hero-asset hero-pencil" src="/hero-assets/1.png" alt="" />
           <img className="hero-asset hero-checklist" src="/hero-assets/2.png" alt="" />
           <img className="hero-asset hero-cap" src="/hero-assets/3.png" alt="" />
@@ -576,10 +621,14 @@ export function LandingPage({ onOpenAuth }) {
                 Get Started Free
               </a>
               <a
-                className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl border-2 sm:border-4 border-white bg-white px-6 py-3.5 text-sm sm:text-base font-black text-ink shadow-[3px_4px_0_#171717] sm:shadow-hard transition hover:-translate-y-0.5 hover:bg-lemon sm:w-auto"
-                href="#program"
+                className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl border-2 sm:border-4 border-white bg-white px-6 py-3.5 text-sm sm:text-base font-black text-ink shadow-[3px_4px_0_#171717] sm:shadow-hard transition hover:-translate-y-0.5 hover:bg-lemon sm:w-auto cursor-pointer"
+                href="#about"
+                onClick={(e) => {
+                  e.preventDefault();
+                  if (onNavigate) onNavigate("about");
+                }}
               >
-                View Interactive Demo
+                More About Us
                 <ArrowRight className="h-4 w-4 sm:h-5 sm:w-5" />
               </a>
             </div>
@@ -883,17 +932,51 @@ export function LandingPage({ onOpenAuth }) {
                 setEmail(event.target.value);
                 setSubmitted(false);
               }}
-              placeholder="sanya@studyloop.app"
+              placeholder="studyloop@gmail.com"
               className="min-h-12 sm:min-h-14 flex-1 rounded-xl sm:rounded-2xl border-2 border-ink/15 bg-[#f8f8f8] px-4 text-sm sm:text-base font-bold text-ink outline-none transition focus:border-ink focus:bg-white"
             />
             <button className="inline-flex min-h-12 sm:min-h-14 w-full sm:w-auto items-center justify-center gap-2 rounded-xl sm:rounded-2xl bg-ink px-6 font-black text-white transition hover:bg-iris" type="submit">
-              Join
+              Join Us
               <ArrowRight className="h-4 w-4 sm:h-5 sm:w-5" />
             </button>
           </form>
           {submitted ? <p className="mt-4 text-xs sm:text-sm font-black text-ink">You&apos;re on the list. Tiny win, big momentum.</p> : null}
         </div>
       </section>
+
+      {/* Footer */}
+      <footer className="border-t-3 border-ink bg-[#171717] px-4 py-8 text-white sm:px-8 lg:px-12">
+        <div className="mx-auto flex max-w-5xl flex-col items-center justify-between gap-4 sm:flex-row text-center sm:text-left">
+          <div>
+            <span className="brand-mark font-black uppercase text-white">StudyLoop</span>
+            <p className="mt-1 text-xs font-bold text-white/60">
+              Study smarter from your mistakes, not just your notes.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            <a
+              href="https://www.instagram.com/studyloop89?igsi=cHMwdnoyMjV1enU0"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="group flex items-center gap-2 rounded-xl border-2 border-white/20 bg-white/10 px-4 py-2.5 text-xs font-black uppercase text-white hover:bg-[#ff57ce] hover:border-white transition shadow-sm"
+            >
+              <Instagram className="h-4 w-4 text-[#ff57ce] group-hover:text-white transition-colors" />
+              <span>Instagram</span>
+            </a>
+
+            <a
+              href="https://in.linkedin.com/in/study-loop-8408a5430"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="group flex items-center gap-2 rounded-xl border-2 border-white/20 bg-white/10 px-4 py-2.5 text-xs font-black uppercase text-white hover:bg-[#0077b5] hover:border-white transition shadow-sm"
+            >
+              <Linkedin className="h-4 w-4 text-[#39d5c8] group-hover:text-white transition-colors" />
+              <span>LinkedIn</span>
+            </a>
+          </div>
+        </div>
+      </footer>
     </main>
   );
 }

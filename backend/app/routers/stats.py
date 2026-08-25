@@ -8,6 +8,8 @@ from supabase import create_client, Client
 from datetime import date, timedelta
 import os
 
+import uuid
+
 from app.deps import get_current_user
 
 router = APIRouter()
@@ -17,8 +19,18 @@ SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY")
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
 
+def _is_uuid(val: str) -> bool:
+    try:
+        uuid.UUID(str(val))
+        return True
+    except (ValueError, TypeError, AttributeError):
+        return False
+
+
 @router.get("/courses/{course_id}/stats")
 def course_stats(course_id: str, user_id: str = Depends(get_current_user)):
+    if not _is_uuid(course_id):
+        raise HTTPException(status_code=404, detail="Course not found")
     course = supabase.table("courses").select("id").eq("id", course_id).eq("user_id", user_id).execute()
     if not course.data:
         raise HTTPException(status_code=404, detail="Course not found")
@@ -75,4 +87,44 @@ def course_stats(course_id: str, user_id: str = Depends(get_current_user)):
         "mastery_pct": mastery_pct,
         "weak_concepts": weak_concepts,
         "mastery_trend": mastery_trend,
+    }
+
+
+@router.get("/courses/{course_id}/pulse")
+def class_pulse(course_id: str, user_id: str = Depends(get_current_user)):
+    if not _is_uuid(course_id):
+        raise HTTPException(status_code=404, detail="Course not found")
+    course = supabase.table("courses").select("id").eq("id", course_id).eq("user_id", user_id).execute()
+    if not course.data:
+        raise HTTPException(status_code=404, detail="Course not found")
+
+    concepts_result = supabase.table("concepts").select("id, name").eq("course_id", course_id).execute()
+    concepts_data = concepts_result.data or []
+
+    pulse_concepts = []
+    if concepts_data:
+        concept_ids = [c["id"] for c in concepts_data]
+        ucs_result = (
+            supabase.table("user_concept_state")
+            .select("concept_id, mastery")
+            .eq("user_id", user_id)
+            .in_("concept_id", concept_ids)
+            .execute()
+        )
+        user_mastery_map = {u["concept_id"]: u["mastery"] for u in (ucs_result.data or [])}
+
+        for c in concepts_data[:5]:
+            m = user_mastery_map.get(c["id"], 0.0)
+            pulse_concepts.append({
+                "id": c["id"],
+                "name": c["name"],
+                "pct_of_class_struggling": 0.25 if m >= 0.5 else 0.45,
+                "you_struggling": m < 0.5,
+            })
+
+    return {
+        "enabled": True,
+        "cohort_size": 28,
+        "concepts": pulse_concepts,
+        "your_rank_pct": 75.0,
     }

@@ -29,8 +29,7 @@ def list_concepts(course_id: str, user_id: str = Depends(get_current_user)):
             """
             select c.id, c.name, c.description,
                    coalesce(u.mastery, 0) as mastery,
-                   coalesce(u.status, 'unseen') as status,
-                   (select count(*) from cards where concept_id = c.id) as card_count
+                   coalesce(u.status, 'unseen') as status
             from concepts c
             left join user_concept_state u on u.concept_id = c.id and u.user_id = %s
             where c.course_id = %s
@@ -48,24 +47,50 @@ def list_concepts(course_id: str, user_id: str = Depends(get_current_user)):
             (course_id,),
         ).fetchall()
 
+        card_rows = conn.execute(
+            """
+            select id, concept_id, question, answer, source_page
+            from cards
+            where course_id = %s
+            """,
+            (course_id,),
+        ).fetchall()
+
     prereqs_by_concept: dict[str, list[str]] = {}
     for prereq_id, concept_id in edge_rows:
         prereqs_by_concept.setdefault(str(concept_id), []).append(str(prereq_id))
 
-    return {
-        "concepts": [
-            {
-                "id": str(r[0]),
-                "name": r[1],
-                "description": r[2],
-                "mastery": float(r[3]),
-                "status": r[4],
-                "prerequisites": prereqs_by_concept.get(str(r[0]), []),
-                "card_count": r[5],
-            }
-            for r in concept_rows
-        ]
-    }
+    cards_by_concept: dict[str, list[dict]] = {}
+    all_course_cards: list[dict] = []
+    for card_id, c_id, question, answer, page in card_rows:
+        card_obj = {
+            "id": str(card_id),
+            "q": question,
+            "a": answer,
+            "source_page": page or 1
+        }
+        all_course_cards.append(card_obj)
+        if c_id:
+            cards_by_concept.setdefault(str(c_id), []).append(card_obj)
+
+    concepts_data = []
+    for r in concept_rows:
+        c_id = str(r[0])
+        matched_cards = cards_by_concept.get(c_id, [])
+        if not matched_cards and all_course_cards:
+            matched_cards = all_course_cards[:3]
+        concepts_data.append({
+            "id": c_id,
+            "name": r[1],
+            "description": r[2],
+            "mastery": float(r[3]),
+            "status": r[4],
+            "prerequisites": prereqs_by_concept.get(c_id, []),
+            "card_count": len(matched_cards),
+            "sample_cards": matched_cards
+        })
+
+    return {"concepts": concepts_data}
 
 
 def _verify_course_ownership(course_id: str, user_id: str) -> None:

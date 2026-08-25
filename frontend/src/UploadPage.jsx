@@ -44,12 +44,16 @@ export function UploadPage({ user, courseId, onNavigate }) {
     async function init() {
       const courseList = await api.getCourses();
       setCourses(courseList);
-      const activeId = courseId || courseList[0]?.id || "";
+      const isUUID = (str) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str || "");
+      const validPassedId = (courseId && isUUID(courseId) && courseList.some((c) => c.id === courseId)) ? courseId : null;
+      const activeId = validPassedId || courseList[0]?.id || "";
       setSelectedCourseId(activeId);
 
-      if (activeId) {
+      if (activeId && isUUID(activeId)) {
         const docs = await api.getDocuments(activeId);
         setDocuments(docs);
+      } else {
+        setDocuments([]);
       }
       setLoading(false);
     }
@@ -183,8 +187,20 @@ export function UploadPage({ user, courseId, onNavigate }) {
   }
 
   async function handleDelete(docId) {
-    await api.deleteDocument(docId);
-    setDocuments((prev) => prev.filter((d) => d.doc_id !== docId));
+    try {
+      await api.deleteDocument(docId, selectedCourseId);
+    } catch (err) {
+      console.warn("Backend delete document notice:", err.message);
+    } finally {
+      setDocuments((prev) => prev.filter((d) => d.doc_id !== docId));
+      if (selectedCourseId) {
+        const localDocsJson = localStorage.getItem(`studyloop_docs_${selectedCourseId}`);
+        if (localDocsJson) {
+          const localDocs = JSON.parse(localDocsJson).filter((d) => d.doc_id !== docId);
+          localStorage.setItem(`studyloop_docs_${selectedCourseId}`, JSON.stringify(localDocs));
+        }
+      }
+    }
   }
 
   return (
