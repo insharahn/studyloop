@@ -33,6 +33,120 @@
   background: #ffd356;
 }
 
+/* Styled Container Scrollbar (Ultra-Thin Subtle Charcoal Thumb, No Arrows) */
+.styled-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(23, 23, 23, 0.3) transparent;
+}
+
+.styled-scrollbar::-webkit-scrollbar {
+  width: 3.5px;
+  height: 3.5px;
+}
+
+.styled-scrollbar::-webkit-scrollbar-button {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+.styled-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.styled-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(23, 23, 23, 0.25);
+  border-radius: 999px;
+}
+
+.styled-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(23, 23, 23, 0.5);
+}
+
+/* Mobile Responsive Toastify Styling */
+.Toastify__toast-container {
+  width: 90vw !important;
+  max-width: 420px !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  top: 1rem !important;
+  padding: 0 !important;
+  z-index: 9999 !important;
+}
+
+.Toastify__toast {
+  border-radius: 16px !important;
+  border: 3px solid #171717 !important;
+  box-shadow: 4px 4px 0px #171717 !important;
+  font-family: inherit !important;
+  font-weight: 800 !important;
+  font-size: 12px !important;
+}
+
+@media (min-width: 640px) {
+  .Toastify__toast-container {
+    width: 380px !important;
+    left: auto !important;
+    right: 1.25rem !important;
+    transform: none !important;
+  }
+}
+
+/* Interactive FAQ Marquee Ticker */
+@keyframes faqMarqueeVertical {
+  0% {
+    transform: translateY(0%);
+  }
+  100% {
+    transform: translateY(-50%);
+  }
+}
+
+.faq-marquee-container {
+  position: relative;
+  max-height: 350px;
+  overflow: hidden;
+  mask-image: linear-gradient(to bottom, transparent 0%, black 5%, black 95%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 5%, black 95%, transparent 100%);
+  transition: max-height 0.3s ease;
+}
+
+@media (min-width: 640px) {
+  .faq-marquee-container {
+    max-height: 400px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .faq-marquee-container {
+    max-height: 420px;
+  }
+}
+
+.faq-marquee-container.has-open-card {
+  mask-image: none !important;
+  -webkit-mask-image: none !important;
+}
+
+.faq-marquee-track {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  animation: faqMarqueeVertical 55s linear infinite;
+  will-change: transform;
+}
+
+@media (hover: hover) {
+  .faq-marquee-track:has(.faq-card:hover) {
+    animation-play-state: paused !important;
+  }
+}
+
+.faq-marquee-track:focus-within,
+.faq-marquee-container.has-open-card .faq-marquee-track {
+  animation-play-state: paused !important;
+}
+
 * {
   scrollbar-width: thin;
   scrollbar-color: #333333 #171717;

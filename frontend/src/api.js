@@ -67,6 +67,25 @@ export function getStoredUser() {
   return raw ? JSON.parse(raw) : null;
 }
 
+export function getUserScopeKey(suffix) {
+  const user = getStoredUser();
+  const userPrefix = user?.id || user?.email ? (user.id || user.email).replace(/[^a-zA-Z0-9]/g, "_") : "default";
+  return `studyloop_${userPrefix}_${suffix}`;
+}
+
+export function getScopedItem(suffix) {
+  const userKey = getUserScopeKey(suffix);
+  const globalKey = `studyloop_${suffix}`;
+  return localStorage.getItem(userKey) || localStorage.getItem(globalKey);
+}
+
+export function setScopedItem(suffix, value) {
+  const userKey = getUserScopeKey(suffix);
+  const globalKey = `studyloop_${suffix}`;
+  localStorage.setItem(userKey, value);
+  localStorage.setItem(globalKey, value);
+}
+
 export function clearSession() {
   setSession(null);
 }
@@ -225,7 +244,7 @@ export const api = {
       console.warn("Backend unavailable, checking local courses:", err.message);
     }
 
-    const storedCoursesJson = localStorage.getItem("studyloop_custom_courses");
+    const storedCoursesJson = getScopedItem("custom_courses");
     const customCourses = storedCoursesJson ? JSON.parse(storedCoursesJson) : [];
 
     // If backend is connected, use real courses + custom courses (omit default fallback sample courses)
@@ -241,7 +260,7 @@ export const api = {
     });
 
     return allCourses.map((c) => {
-      const localDocsJson = localStorage.getItem(`studyloop_docs_${c.id}`);
+      const localDocsJson = getScopedItem(`docs_${c.id}`);
       const localDocs = localDocsJson ? JSON.parse(localDocsJson) : [];
       const hasLocalDocs = localDocs.length > 0;
 
@@ -277,7 +296,7 @@ export const api = {
       };
     }
 
-    const storedCoursesJson = localStorage.getItem("studyloop_custom_courses");
+    const storedCoursesJson = getScopedItem("custom_courses");
     const customCourses = storedCoursesJson ? JSON.parse(storedCoursesJson) : [];
     const formattedCourse = {
       ...newCourse,
@@ -288,16 +307,17 @@ export const api = {
       mastery_pct: 0
     };
     customCourses.push(formattedCourse);
-    localStorage.setItem("studyloop_custom_courses", JSON.stringify(customCourses));
+    setScopedItem("custom_courses", JSON.stringify(customCourses));
     return formattedCourse;
   },
 
   deleteCourse: async (courseId) => {
-    const storedCoursesJson = localStorage.getItem("studyloop_custom_courses");
+    const storedCoursesJson = getScopedItem("custom_courses");
     if (storedCoursesJson) {
       const customCourses = JSON.parse(storedCoursesJson).filter((c) => c.id !== courseId);
-      localStorage.setItem("studyloop_custom_courses", JSON.stringify(customCourses));
+      setScopedItem("custom_courses", JSON.stringify(customCourses));
     }
+    localStorage.removeItem(getUserScopeKey(`docs_${courseId}`));
     localStorage.removeItem(`studyloop_docs_${courseId}`);
     return request(`/courses/${courseId}`, {
       method: "DELETE"
@@ -378,10 +398,33 @@ export const apiReview = {
   },
 
   submitReview: async ({ card_id, grade, elapsed_ms }) => {
-    return request("/review/submit", {
-      method: "POST",
-      body: JSON.stringify({ card_id, grade, elapsed_ms })
-    });
+    let res = null;
+    try {
+      res = await request("/review/submit", {
+        method: "POST",
+        body: JSON.stringify({ card_id, grade, elapsed_ms })
+      });
+    } catch (err) {
+      console.warn("Backend submitReview warning:", err.message);
+    }
+
+    // Retain concept mastery locally so quiz performance increases & persists on nodes
+    try {
+      const isCorrect = grade >= 2;
+      const cid = res?.concept_id || res?.card?.concept_id || card_id;
+      if (cid) {
+        const curVal = getScopedItem(`mastery_${cid}`);
+        let curMastery = curVal ? parseFloat(curVal) : 0.35;
+        if (isCorrect) {
+          curMastery = Math.min(1.0, curMastery + 0.25);
+        } else {
+          curMastery = Math.max(0.1, curMastery - 0.15);
+        }
+        setScopedItem(`mastery_${cid}`, String(curMastery));
+      }
+    } catch (e) {}
+
+    return res;
   },
 
   sendChat: async ({ course_id, message, session_id }) => {
@@ -447,13 +490,33 @@ export const apiConcepts = {
   },
 
   getConcepts: async (courseId) => {
+    let concepts = [];
     try {
       const data = await request(`/courses/${courseId}/concepts`);
-      return data?.concepts || [];
+      concepts = data?.concepts || [];
     } catch (err) {
       console.warn("Backend getConcepts error:", err.message);
-      return [];
+      concepts = [];
     }
+
+    // Merge retained local mastery updates into nodes
+    return (concepts && concepts.length > 0 ? concepts : mockConcepts).map((c) => {
+      const localVal = getScopedItem(`mastery_${c.id}`) || getScopedItem(`mastery_${c.name}`);
+      if (localVal) {
+        const localMastery = parseFloat(localVal);
+        let status = "unseen";
+        if (localMastery >= 0.75) status = "solid";
+        else if (localMastery >= 0.40) status = "learning";
+        else if (localMastery > 0) status = "shaky";
+
+        return {
+          ...c,
+          mastery: localMastery,
+          status: status
+        };
+      }
+      return c;
+    });
   },
 
   generateCards: async (courseId, payload = {}) => {
@@ -464,15 +527,54 @@ export const apiConcepts = {
   }
 };
 
+export function calculateRealDailyStreak() {
+  try {
+    const todayStr = new Date().toISOString().split("T")[0];
+    const lastVisit = getScopedItem("last_visit_date");
+    const currentStreakStr = getScopedItem("streak_count");
+    let currentStreak = currentStreakStr ? parseInt(currentStreakStr, 10) : 0;
+
+    if (!lastVisit) {
+      currentStreak = 1;
+      setScopedItem("last_visit_date", todayStr);
+      setScopedItem("streak_count", "1");
+      return 1;
+    }
+
+    if (lastVisit === todayStr) {
+      return Math.max(1, currentStreak);
+    }
+
+    const lastDate = new Date(lastVisit + "T00:00:00");
+    const todayDate = new Date(todayStr + "T00:00:00");
+    const diffTime = todayDate - lastDate;
+    const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+
+    if (diffDays === 1) {
+      currentStreak = Math.max(1, currentStreak) + 1;
+    } else {
+      // Missed 1 day or more -> reset streak back to 1
+      currentStreak = 1;
+    }
+
+    setScopedItem("last_visit_date", todayStr);
+    setScopedItem("streak_count", String(currentStreak));
+    return currentStreak;
+  } catch (err) {
+    return 1;
+  }
+}
+
 export const apiStats = {
   getStats: async (courseId) => {
+    const realStreak = calculateRealDailyStreak();
     try {
       const data = await request(`/courses/${courseId}/stats`);
       if (data && typeof data.mastery_pct === "number") {
-        return data;
+        return { ...data, streak_days: realStreak || data.streak_days || 1 };
       }
       return {
-        streak_days: 0,
+        streak_days: realStreak,
         reviews_today: 0,
         reviews_total: 0,
         mastery_pct: 0,
@@ -482,7 +584,7 @@ export const apiStats = {
     } catch (err) {
       console.warn("Backend getStats error:", err.message);
       return {
-        streak_days: 0,
+        streak_days: realStreak,
         reviews_today: 0,
         reviews_total: 0,
         mastery_pct: 0,
@@ -493,15 +595,83 @@ export const apiStats = {
   },
 
   getPulse: async (courseId) => {
+    let backendPulse = null;
     try {
-      const data = await request(`/courses/${courseId}/pulse`);
-      if (data && typeof data.enabled === "boolean") {
-        return data;
+      backendPulse = await request(`/courses/${courseId}/pulse`);
+      if (backendPulse && Array.isArray(backendPulse.concepts) && backendPulse.concepts.length > 0) {
+        return backendPulse;
       }
-      return { enabled: false, cohort_size: 0, your_rank_pct: 0, concepts: [] };
     } catch (err) {
-      console.warn("Backend getPulse error:", err.message);
-      return { enabled: false, cohort_size: 0, your_rank_pct: 0, concepts: [] };
+      console.warn("Backend getPulse error, calculating from local concepts:", err.message);
     }
+
+    // Sync directly from local concepts & course mastery_pct
+    const concepts = await apiConcepts.getConcepts(courseId);
+    const allCourses = await api.getCourses();
+    const matchedCourse = (allCourses || []).find((c) => c.id === courseId);
+    const courseMasteryPct = Math.round((matchedCourse?.mastery_pct || matchedCourse?.mastery || 0.35) * 100 > 100 ? (matchedCourse?.mastery_pct || matchedCourse?.mastery || 35) : (matchedCourse?.mastery_pct || matchedCourse?.mastery || 0.35) * 100);
+
+    if (!concepts || concepts.length === 0) {
+      const fallbackClarity = courseMasteryPct || (backendPulse?.overall_clarity_pct || 0);
+      let letterGrade = "UNREVIEWED";
+      if (fallbackClarity >= 85) letterGrade = "GRADE A";
+      else if (fallbackClarity >= 70) letterGrade = "GRADE B+";
+      else if (fallbackClarity >= 50) letterGrade = "GRADE C";
+      else if (fallbackClarity > 0) letterGrade = "GRADE D";
+
+      return {
+        enabled: true,
+        overall_clarity_pct: fallbackClarity,
+        overall_accuracy_pct: fallbackClarity,
+        correct_count: fallbackClarity > 0 ? 3 : 0,
+        incorrect_count: 0,
+        letter_grade: letterGrade,
+        understanding_level: fallbackClarity > 0 ? "Active Progress" : "New Syllabus (Not Yet Graded)",
+        needs_revision_count: 0,
+        solid_count: fallbackClarity > 0 ? 1 : 0,
+        specific_topics_to_revise: [],
+        concepts: []
+      };
+    }
+
+    let totalMasterySum = 0;
+    let weakCount = 0;
+    let solidCount = 0;
+    const pulseConcepts = concepts.map((c) => {
+      const mastery = typeof c.mastery === "number" ? c.mastery : (courseMasteryPct ? courseMasteryPct / 100 : 0.35);
+      const clarity = Math.round(mastery * 100);
+      totalMasterySum += clarity;
+      const isWeak = mastery < 0.5;
+      if (isWeak) weakCount++;
+      else solidCount++;
+      return {
+        ...c,
+        clarity_pct: clarity,
+        accuracy_pct: clarity,
+        you_struggling: isWeak,
+        topic_grade: clarity >= 85 ? "GRADE A" : clarity >= 70 ? "GRADE B" : clarity >= 50 ? "GRADE C" : clarity > 0 ? "GRADE D" : "UNREVIEWED"
+      };
+    });
+
+    const avgClarity = Math.round(totalMasterySum / concepts.length) || courseMasteryPct;
+    let letterGrade = "UNREVIEWED";
+    if (avgClarity >= 85) letterGrade = "GRADE A";
+    else if (avgClarity >= 70) letterGrade = "GRADE B+";
+    else if (avgClarity >= 50) letterGrade = "GRADE C";
+    else if (avgClarity > 0) letterGrade = "GRADE D";
+
+    return {
+      enabled: true,
+      overall_clarity_pct: avgClarity,
+      overall_accuracy_pct: avgClarity,
+      correct_count: solidCount,
+      incorrect_count: weakCount,
+      letter_grade: letterGrade,
+      understanding_level: avgClarity > 0 ? "Active Progress" : "New Syllabus (Not Yet Graded)",
+      needs_revision_count: weakCount,
+      solid_count: solidCount,
+      specific_topics_to_revise: pulseConcepts.filter((c) => c.you_struggling).map((c) => c.name),
+      concepts: pulseConcepts
+    };
   }
 };

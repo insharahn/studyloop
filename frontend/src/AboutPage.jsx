@@ -1,6 +1,6 @@
 // src/AboutPage.jsx
 import { useEffect, useRef } from "react";
-import { ArrowLeft, Heart, ArrowRight, Instagram, Linkedin } from "lucide-react";
+import { ArrowLeft, Heart, ArrowRight, Instagram, Linkedin, Mail } from "lucide-react";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 
@@ -11,24 +11,41 @@ export function AboutPage({ onNavigate, onOpenAuth }) {
 
   useEffect(() => {
     const ctx = gsap.context(() => {
-      // Hero entrance
-      gsap.from("[data-about-hero]", {
-        y: 35,
-        opacity: 0,
-        duration: 0.8,
-        stagger: 0.12,
-        ease: "power3.out"
-      });
+      const isMobile = typeof window !== "undefined" && window.innerWidth < 768;
+
+      // Hero headline & subheading entrance matching "How it works"
+      gsap.timeline()
+        .from("[data-about-badge]", {
+          y: -20,
+          opacity: 0,
+          duration: 0.5,
+          ease: "back.out(1.7)"
+        })
+        .from("[data-about-title-word]", {
+          yPercent: 110,
+          rotate: 4,
+          opacity: 0,
+          stagger: 0.08,
+          duration: 0.7,
+          ease: "power4.out"
+        }, "-=0.2")
+        .from("[data-about-subheading]", {
+          y: 28,
+          opacity: 0,
+          duration: 0.6,
+          ease: "power3.out"
+        }, "-=0.2");
 
       // Story Card scroll trigger
       gsap.from("[data-about-story]", {
         scrollTrigger: {
           trigger: "[data-about-story-section]",
-          start: "top 85%",
-          end: "bottom 15%",
+          start: isMobile ? "top 92%" : "top 85%",
+          end: "bottom top",
           toggleActions: "play reverse play reverse"
         },
-        x: -30,
+        y: isMobile ? 25 : 0,
+        x: isMobile ? 0 : -30,
         opacity: 0,
         duration: 0.8,
         ease: "power3.out"
@@ -37,50 +54,61 @@ export function AboutPage({ onNavigate, onOpenAuth }) {
       // Phone Frame scroll trigger
       gsap.from("[data-about-phone]", {
         scrollTrigger: {
-          trigger: "[data-about-story-section]",
-          start: "top 85%",
-          end: "bottom 15%",
-          toggleActions: "play reverse play reverse"
-        },
-        x: 30,
-        scale: 0.92,
-        opacity: 0,
-        duration: 0.8,
-        ease: "power3.out"
-      });
-
-      // Team Section Title & Image
-      gsap.from("[data-about-team-title]", {
-        scrollTrigger: {
-          trigger: "[data-about-team-section]",
-          start: "top 85%",
-          end: "bottom 15%",
+          trigger: "[data-about-phone]",
+          start: isMobile ? "top 92%" : "top 85%",
+          end: "bottom top",
           toggleActions: "play reverse play reverse"
         },
         y: 25,
+        scale: 0.94,
         opacity: 0,
-        duration: 0.7,
+        duration: 0.8,
         ease: "power3.out"
       });
 
-      gsap.from("[data-about-team-img]", {
+      // Team Section Title Word Reveal Animation
+      gsap.timeline({
         scrollTrigger: {
           trigger: "[data-about-team-section]",
-          start: "top 80%",
-          end: "bottom 15%",
+          start: isMobile ? "top 92%" : "top 85%",
+          end: "bottom top",
+          toggleActions: "play reverse play reverse"
+        }
+      })
+        .from("[data-about-team-title-word]", {
+          yPercent: 110,
+          rotate: 4,
+          opacity: 0,
+          stagger: 0.08,
+          duration: 0.7,
+          ease: "power4.out"
+        })
+        .from("[data-about-team-subheading]", {
+          y: 24,
+          opacity: 0,
+          duration: 0.6,
+          ease: "power3.out"
+        }, "-=0.3");
+
+      gsap.from("[data-about-team-img]", {
+        scrollTrigger: {
+          trigger: "[data-about-team-img]",
+          start: isMobile ? "top 90%" : "top 80%",
+          end: "bottom top",
           toggleActions: "play reverse play reverse"
         },
-        scale: 0.9,
+        scale: 0.92,
+        opacity: 0,
         duration: 0.8,
-        ease: "back.out(1.5)"
+        ease: "back.out(1.4)"
       });
 
       // CTA scroll trigger
       gsap.from("[data-about-cta]", {
         scrollTrigger: {
           trigger: "[data-about-cta-section]",
-          start: "top 90%",
-          end: "bottom 10%",
+          start: isMobile ? "top 92%" : "top 90%",
+          end: "bottom top",
           toggleActions: "play reverse play reverse"
         },
         y: 30,
@@ -97,15 +125,15 @@ export function AboutPage({ onNavigate, onOpenAuth }) {
   return (
     <div ref={containerRef} className="min-h-screen bg-[#171717] text-white selection:bg-[#ffd356] selection:text-[#171717] overflow-x-hidden">
       {/* Top Navbar */}
-      <nav className="border-b-3 border-white/10 bg-[#171717]/90 px-4 py-4 backdrop-blur-md sticky top-0 z-50 sm:px-8 lg:px-12">
+      <nav className="bg-[#171717]/95 px-3 py-3 sm:px-8 sm:py-4 backdrop-blur-md sticky top-0 z-50 lg:px-12">
         <div className="mx-auto flex max-w-6xl items-center justify-between">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
             <button
               onClick={() => onNavigate && onNavigate("landing")}
-              className="flex h-10 w-10 items-center justify-center rounded-xl border-2 border-white/20 bg-white/10 text-white hover:bg-white hover:text-[#171717] transition shadow-sm"
+              className="flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-xl border-2 border-white/20 bg-white/10 text-white hover:bg-white hover:text-[#171717] transition shadow-sm"
               title="Back to Home"
             >
-              <ArrowLeft className="h-5 w-5" />
+              <ArrowLeft className="h-4 w-4 sm:h-5 sm:w-5" />
             </button>
             <span
               onClick={() => onNavigate && onNavigate("landing")}
@@ -149,7 +177,7 @@ export function AboutPage({ onNavigate, onOpenAuth }) {
 
             <button
               onClick={() => onOpenAuth && onOpenAuth()}
-              className="contact-ring relative z-20 rounded-full px-4 py-2 text-xs font-bold text-white/90 hover:text-white transition"
+              className="contact-ring relative z-20 rounded-full px-3 py-1.5 sm:px-4 sm:py-2 text-[11px] sm:text-xs font-bold text-white/90 hover:text-white transition"
             >
               Join Us
             </button>
@@ -158,15 +186,34 @@ export function AboutPage({ onNavigate, onOpenAuth }) {
       </nav>
 
       {/* Hero Section */}
-      <section className="relative overflow-hidden px-4 py-12 sm:px-8 sm:py-20 lg:px-12">
+      <section className="relative overflow-hidden px-4 pt-10 pb-8 sm:px-8 sm:pt-14 sm:pb-14 lg:px-12">
         <div className="mx-auto max-w-4xl text-center">
-          <span data-about-hero className="inline-flex items-center rounded-full border-2 border-[#171717] bg-[#ffd356] px-4 py-1 text-xs font-black uppercase text-[#171717] shadow-sm mb-4">
+          <span data-about-badge className="inline-flex items-center rounded-full border-2 border-[#171717] bg-[#ffd356] px-3.5 py-1 text-[11px] sm:text-xs font-black uppercase text-[#171717] shadow-sm mb-3">
             OUR STORY & TEAM
           </span>
-          <h1 data-about-hero className="font-display text-4xl uppercase tracking-tight sm:text-6xl md:text-7xl leading-none">
-            4 Students. 3 Nations. <span className="text-[#ffd356]">1 Mission.</span>
+          <h1 className="font-display text-2xl uppercase tracking-tight sm:text-6xl md:text-7xl leading-snug sm:leading-none text-center">
+            <div className="flex flex-wrap justify-center items-center gap-x-2 sm:gap-x-4 gap-y-1 sm:gap-y-2">
+              <span className="loop-title-word-wrap inline-block">
+                <span data-about-title-word>4</span>
+              </span>
+              <span className="loop-title-word-wrap inline-block">
+                <span data-about-title-word>Students.</span>
+              </span>
+              <span className="loop-title-word-wrap inline-block">
+                <span data-about-title-word>3</span>
+              </span>
+              <span className="loop-title-word-wrap inline-block">
+                <span data-about-title-word>Nations.</span>
+              </span>
+              <span className="loop-title-word-wrap inline-block text-[#ffd356]">
+                <span data-about-title-word>1</span>
+              </span>
+              <span className="loop-title-word-wrap inline-block text-[#ffd356]">
+                <span data-about-title-word>Mission.</span>
+              </span>
+            </div>
           </h1>
-          <p data-about-hero className="mx-auto mt-5 max-w-2xl text-sm font-bold leading-relaxed text-white/80 sm:text-lg">
+          <p data-about-subheading className="mx-auto mt-4 max-w-xl text-xs font-bold leading-relaxed text-white/80 sm:text-lg px-2">
             We built StudyLoop out of personal frustration with unreliable AI study tools, exam anxiety, and infinite flashcard queues.
           </p>
         </div>
@@ -270,10 +317,18 @@ export function AboutPage({ onNavigate, onOpenAuth }) {
       {/* Pixel Art Team Graphic & Gen-Z Speech Bubble Cards */}
       <section data-about-team-section className="px-4 py-12 sm:px-8 lg:px-12">
         <div className="mx-auto max-w-6xl text-center">
-          <h2 data-about-team-title className="font-display text-3xl uppercase tracking-tight sm:text-5xl text-white mb-1">
-            Meet The Team
+          <h2 className="font-display text-3xl uppercase tracking-tight sm:text-5xl text-white mb-1 leading-none">
+            <span className="loop-title-word-wrap inline-block">
+              <span data-about-team-title-word>Meet</span>
+            </span>{" "}
+            <span className="loop-title-word-wrap inline-block">
+              <span data-about-team-title-word>The</span>
+            </span>{" "}
+            <span className="loop-title-word-wrap inline-block text-[#ffd356]">
+              <span data-about-team-title-word>Team</span>
+            </span>
           </h2>
-          <p data-about-team-title className="text-xs font-bold text-white/60 sm:text-sm mb-10">
+          <p data-about-team-subheading className="text-xs font-bold text-white/60 sm:text-sm mb-10">
             Cross-border collaboration between India 🇮🇳, Pakistan 🇵🇰, and Nepal 🇳🇵
           </p>
 
@@ -398,12 +453,18 @@ export function AboutPage({ onNavigate, onOpenAuth }) {
               <Instagram className="h-4 w-4 text-[#ff57ce] group-hover:text-white transition-colors" /> Instagram
             </a>
             <a
-              href="https://in.linkedin.com/in/study-loop-8408a5430"
+              href="https://www.linkedin.com/company/studyloopp/"
               target="_blank"
               rel="noopener noreferrer"
               className="group flex items-center gap-2 rounded-xl border-2 border-white/20 bg-white/10 px-4 py-2 text-xs font-black uppercase text-white hover:bg-[#0077b5] hover:border-white transition"
             >
               <Linkedin className="h-4 w-4 text-[#39d5c8] group-hover:text-white transition-colors" /> LinkedIn
+            </a>
+            <a
+              href="mailto:studyloop770@gmail.com"
+              className="group flex items-center gap-2 rounded-xl border-2 border-white/20 bg-white/10 px-4 py-2 text-xs font-black uppercase text-white hover:bg-[#ea4335] hover:border-white transition"
+            >
+              <Mail className="h-4 w-4 text-[#ffd356] group-hover:text-white transition-colors" /> Email
             </a>
           </div>
         </div>

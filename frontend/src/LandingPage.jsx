@@ -5,7 +5,12 @@ import {
   MessageSquareText,
   RotateCcw,
   Instagram,
-  Linkedin
+  Linkedin,
+  Mail,
+  Plus,
+  Minus,
+  ChevronDown,
+  HelpCircle
 } from "lucide-react";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
@@ -195,6 +200,59 @@ const programTabs = [
   }
 ];
 
+const faqs = [
+  {
+    id: 1,
+    q: "What makes StudyLoop different from ChatGPT or generic AI tools?",
+    a: "Generic AI tools often hallucinate, make up facts, and give fake page citations. StudyLoop strictly searches your uploaded lecture slides and PDFs, links every answer to an exact page number, and explicitly tells you if a topic isn't in your notes."
+  },
+  {
+    id: 2,
+    q: "Does StudyLoop work smoothly on mobile phones?",
+    a: "Yes! StudyLoop is built mobile-first. You can view your concept map, answer practice flashcards, upload PDFs, and check your daily streak right from your phone browser without installing an app."
+  },
+  {
+    id: 3,
+    q: "What document formats can I upload to StudyLoop?",
+    a: "You can upload any PDF files, including lecture slide decks, syllabus outlines, lab guides, and textbook chapters. StudyLoop indexes every page while preserving slide numbers."
+  },
+  {
+    id: 4,
+    q: "How does the Exam-Date Planner work?",
+    a: "When you add a course, you set your midterm or final exam date. StudyLoop automatically calculates the ideal number of practice cards you need to complete daily to achieve 100% mastery before test day."
+  },
+  {
+    id: 5,
+    q: "What is the Root-Cause Concept Map?",
+    a: "If you get a flashcard question wrong, StudyLoop doesn't just mark it incorrect. It traces back to the basic prerequisite topic you missed (e.g., Tree Rotations before AVL Trees) so you fix foundation gaps before exam day."
+  },
+  {
+    id: 6,
+    q: "Is StudyLoop free to use for students?",
+    a: "Yes! You can sign up, create courses, upload PDFs, generate flashcards, ask doubt questions with page citations, and track your daily streak completely free."
+  },
+  {
+    id: 7,
+    q: "How does StudyLoop help me retain information long-term?",
+    a: "StudyLoop combines spaced repetition with real-time concept mastery tracking. Review queues dynamically prioritize weak topics so you retain key ideas past test day."
+  },
+  {
+    id: 8,
+    q: "Are my uploaded lecture notes and PDFs kept private?",
+    a: "Absolutely. Your uploaded documents and notes are stored securely and bound strictly to your personal account. They are never shared publicly or used to train public models."
+  },
+  {
+    id: 9,
+    q: "What happens if I miss a day of studying?",
+    a: "StudyLoop's exam deadline planner automatically adjusts your daily queue so you stay on track without getting overwhelmed by an impossible backlog."
+  },
+  {
+    id: 10,
+    q: "Can I use StudyLoop for multiple university courses at once?",
+    a: "Yes! You can create separate workspace courses for each subject (e.g., Data Structures, Organic Chemistry, Microeconomics), each with its own uploaded PDFs, concept map, and exam date."
+  }
+];
+
 function ProgramVisual({ type }) {
   if (type === "upload") {
     return (
@@ -221,11 +279,13 @@ function ProgramVisual({ type }) {
 
   if (type === "ask") {
     return (
-      <div className="how-ui-preview space-y-2 rounded-2xl border-[3px] border-white/80 bg-white p-3 text-ink">
-        <p data-chat-bubble className="max-w-[82%] rounded-xl bg-paper px-3 py-2 text-xs font-bold">Why does AVL rotation fix imbalance?</p>
-        <div data-chat-bubble className="ml-auto max-w-[88%] rounded-xl bg-aqua px-3 py-2 text-xs font-bold">
-          <span data-chat-text className="chat-type-text">Rotations restore height bounds using the local subtree structure.</span>
-          <span data-citation-tag className="mt-2 inline-block rounded-full bg-ink px-2.5 py-1 text-[10px] font-black text-white">[Page 14, Lecture 04]</span>
+      <div className="how-ui-preview space-y-2 rounded-2xl border-[3px] border-white/80 bg-white p-3 text-ink min-h-[140px] sm:min-h-[150px] flex flex-col justify-center">
+        <p data-chat-bubble className="max-w-[85%] rounded-xl bg-paper px-3 py-2 text-[11px] font-bold leading-tight">Why does AVL rotation fix imbalance?</p>
+        <div data-chat-bubble className="ml-auto w-full max-w-[90%] rounded-xl bg-aqua px-3 py-2 text-[11px] font-bold">
+          <p className="leading-tight min-h-[32px] overflow-hidden">
+            <span data-chat-text className="inline-block whitespace-normal">Rotations restore height bounds using the local subtree structure.</span>
+          </p>
+          <span data-citation-tag className="mt-1.5 inline-block rounded-full bg-ink px-2.5 py-0.5 text-[9px] font-black text-white">[Page 14, Lecture 04]</span>
         </div>
       </div>
     );
@@ -253,6 +313,9 @@ export function LandingPage({ onOpenAuth, onNavigate }) {
   const [activeTab, setActiveTab] = useState(0);
   const [email, setEmail] = useState("");
   const [submitted, setSubmitted] = useState(false);
+  const [openFaq, setOpenFaq] = useState(null);
+
+  const toggleFaq = (idx) => setOpenFaq(openFaq === idx ? null : idx);
 
   useEffect(() => {
     const ctx = gsap.context(() => {
@@ -275,12 +338,15 @@ export function LandingPage({ onOpenAuth, onNavigate }) {
         stagger: 0.15
       });
 
+      const isMobile = typeof window !== "undefined" && window.innerWidth < 768;
+
       // Section 2 Scroll Trigger
       gsap.from("[data-loop-heading]", {
         scrollTrigger: {
           trigger: "[data-loop-section]",
-          start: "top 72%",
-          once: true
+          start: isMobile ? "top 88%" : "top 72%",
+          end: "bottom top",
+          toggleActions: "play reverse play reverse"
         },
         y: 34,
         opacity: 0,
@@ -291,9 +357,9 @@ export function LandingPage({ onOpenAuth, onNavigate }) {
       gsap.timeline({
         scrollTrigger: {
           trigger: "[data-loop-section]",
-          start: "top 82%",
-          end: "top 38%",
-          scrub: 0.8
+          start: isMobile ? "top 90%" : "top 82%",
+          end: isMobile ? "top 20%" : "top 38%",
+          scrub: isMobile ? 0.4 : 0.8
         }
       })
         .from("[data-loop-title-word]", {
@@ -325,18 +391,18 @@ export function LandingPage({ onOpenAuth, onNavigate }) {
       gsap.timeline({
         scrollTrigger: {
           trigger: "[data-loop-grid]",
-          start: "top 90%",
-          end: "center 52%",
-          scrub: 0.8
+          start: isMobile ? "top 85%" : "top 90%",
+          end: isMobile ? "bottom 90%" : "center 52%",
+          scrub: isMobile ? 0.4 : 0.8
         }
       }).from(loopCards, {
-        y: 120,
-        scale: 0.82,
-        rotateX: 16,
-        rotateZ: -3,
+        y: isMobile ? 30 : 120,
+        scale: isMobile ? 1 : 0.82,
+        rotateX: isMobile ? 0 : 16,
+        rotateZ: isMobile ? 0 : -3,
         opacity: 0,
-        filter: "blur(18px)",
-        stagger: 0.18,
+        filter: isMobile ? "none" : "blur(18px)",
+        stagger: isMobile ? 0.1 : 0.18,
         ease: "power3.out"
       });
 
@@ -344,15 +410,16 @@ export function LandingPage({ onOpenAuth, onNavigate }) {
       gsap.from("[data-loop-visual]", {
         scrollTrigger: {
           trigger: "[data-loop-grid]",
-          start: "top 58%",
-          once: true
+          start: isMobile ? "top 80%" : "top 58%",
+          end: "bottom top",
+          toggleActions: "play reverse play reverse"
         },
-        y: 24,
-        scale: 0.94,
+        y: isMobile ? 0 : 24,
+        scale: 1,
         opacity: 0,
         duration: 0.65,
         stagger: 0.12,
-        ease: "back.out(1.4)"
+        ease: "power3.out"
       });
 
       // Micro-interaction 1: Upload scanning & parsing animation
@@ -364,10 +431,9 @@ export function LandingPage({ onOpenAuth, onNavigate }) {
 
       // Micro-interaction 2: Interactive chat bubbles & citation tag
       gsap.timeline({ repeat: -1, repeatDelay: 0.85 })
-        .fromTo("[data-chat-bubble]", { y: 10, scale: 0.96, opacity: 0 }, { y: 0, scale: 1, opacity: 1, duration: 0.36, stagger: 0.34, ease: "back.out(1.7)" })
-        .fromTo("[data-chat-text]", { width: "0%" }, { width: "100%", duration: 0.8, ease: "steps(18)" }, 0.55)
-        .fromTo("[data-citation-tag]", { scale: 0.78, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.28, ease: "back.out(2)" }, 1.2)
-        .to("[data-chat-bubble]", { opacity: 0, y: -6, duration: 0.25, stagger: 0.08 }, 2.2);
+        .fromTo("[data-chat-bubble]", { y: 6, opacity: 0 }, { y: 0, opacity: 1, duration: 0.36, stagger: 0.34, ease: "power2.out" })
+        .fromTo("[data-citation-tag]", { opacity: 0 }, { opacity: 1, duration: 0.28, ease: "power2.out" }, 1.0)
+        .to("[data-chat-bubble]", { opacity: 0, y: -4, duration: 0.25, stagger: 0.08 }, 2.2);
 
       // Micro-interaction 3: Root cause prerequisite & mastery recalibration bar
       gsap.timeline({ repeat: -1, repeatDelay: 0.75 })
@@ -381,9 +447,9 @@ export function LandingPage({ onOpenAuth, onNavigate }) {
       gsap.timeline({
         scrollTrigger: {
           trigger: "#program",
-          start: "top 82%",
-          end: "top 45%",
-          scrub: 0.8
+          start: isMobile ? "top 90%" : "top 82%",
+          end: isMobile ? "top 30%" : "top 45%",
+          scrub: isMobile ? 0.4 : 0.8
         }
       })
         .from("[data-program-title-word]", {
@@ -404,8 +470,9 @@ export function LandingPage({ onOpenAuth, onNavigate }) {
       gsap.from("[data-program-panel]", {
         scrollTrigger: {
           trigger: "#program",
-          start: "top 70%",
-          once: true
+          start: isMobile ? "top 85%" : "top 70%",
+          end: "bottom top",
+          toggleActions: "play reverse play reverse"
         },
         y: 40,
         opacity: 0,
@@ -413,13 +480,41 @@ export function LandingPage({ onOpenAuth, onNavigate }) {
         ease: "power3.out"
       });
 
+      // FAQ Section Title & Subheading GSAP Animation (Scrubbed like "Your revision is honest")
+      gsap.timeline({
+        scrollTrigger: {
+          trigger: "#faq",
+          start: isMobile ? "top 90%" : "top 82%",
+          end: isMobile ? "top 35%" : "top 48%",
+          scrub: isMobile ? 0.4 : 0.8
+        }
+      })
+        .from("[data-faq-badge]", {
+          y: -20,
+          opacity: 0,
+          scale: 0.8,
+          ease: "back.out(1.7)"
+        })
+        .from("[data-faq-title-word]", {
+          yPercent: 110,
+          rotate: 4,
+          opacity: 0,
+          stagger: 0.06,
+          ease: "power4.out"
+        }, "-=0.2")
+        .from("[data-faq-subheading]", {
+          y: 28,
+          opacity: 0,
+          ease: "power3.out"
+        }, "-=0.2");
+
       // Section 4 (Waitlist) Headline & Content GSAP Animation
       gsap.timeline({
         scrollTrigger: {
           trigger: "#waitlist",
-          start: "top 88%",
-          end: "center 55%",
-          scrub: 1.2
+          start: isMobile ? "top 92%" : "top 88%",
+          end: isMobile ? "center 70%" : "center 55%",
+          scrub: isMobile ? 0.4 : 1.2
         }
       })
         .from("[data-waitlist-title-word]", {
@@ -514,11 +609,11 @@ export function LandingPage({ onOpenAuth, onNavigate }) {
       {/* Hero Section */}
       <section data-hero className="hero-noise relative min-h-screen overflow-hidden px-4 pb-12 pt-6 sm:px-8 sm:pt-8 lg:px-12">
         <nav data-rise className="relative z-20 mx-auto grid max-w-5xl grid-cols-2 items-center text-[11px] font-medium text-white/65 sm:grid-cols-5">
-          <a className="hidden justify-self-start transition hover:text-white sm:block" href="#loop">
-            Feature
+          <a className="hidden justify-self-start transition hover:text-white sm:block" href="#program">
+            Features
           </a>
-          <a className="hidden justify-self-center transition hover:text-white sm:block" href="#program">
-            Our Services
+          <a className="hidden justify-self-center transition hover:text-white sm:block" href="#faq">
+            FAQ
           </a>
           <a className="brand-mark justify-self-start font-black uppercase tracking-normal text-white sm:justify-self-center" href="#">
             StudyLoop
@@ -580,7 +675,7 @@ export function LandingPage({ onOpenAuth, onNavigate }) {
           </div>
         </nav>
 
-        <div className="hero-poster relative z-10 mx-auto flex min-h-0 sm:min-h-[calc(100vh-96px)] max-w-5xl items-center justify-center py-6 sm:py-16">
+        <div className="hero-poster relative z-10 mx-auto flex min-h-0 sm:min-h-[calc(100vh-96px)] max-w-5xl items-center justify-center pt-10 pb-8 sm:py-16 mt-4 sm:mt-6">
           <img className="hero-asset hero-pencil" src="/hero-assets/1.png" alt="" />
           <img className="hero-asset hero-checklist" src="/hero-assets/2.png" alt="" />
           <img className="hero-asset hero-cap" src="/hero-assets/3.png" alt="" />
@@ -696,7 +791,7 @@ export function LandingPage({ onOpenAuth, onNavigate }) {
       </section>
 
       {/* Program / Core Differentiators Section (Updated with #242424 bg and matched GSAP) */}
-      <section id="program" className="relative bg-[#242424] px-4 pb-24 pt-10 sm:px-8 sm:pb-28 lg:px-12">
+      <section id="program" className="relative bg-[#242424] px-4 pb-6 pt-8 sm:px-8 sm:pb-16 sm:pt-10 lg:px-12">
         <div className="relative mx-auto max-w-5xl">
           
           {/* Animated Headline with Increased Capsule Padding */}
@@ -800,41 +895,41 @@ export function LandingPage({ onOpenAuth, onNavigate }) {
               </div>
 
               {/* Right Column */}
-              <div className="relative rounded-[20px] sm:rounded-[24px] border-4 border-[#171717] bg-white p-3.5 sm:p-5 md:p-6 shadow-hard">
+              <div className="relative rounded-[18px] sm:rounded-[24px] border-3 sm:border-4 border-[#171717] bg-white p-2.5 sm:p-5 md:p-6 shadow-hard">
                 {/* Top Bar Indicator */}
-                <div className="mb-3 flex items-center gap-1.5 border-b-2 border-gray-100 pb-2.5">
+                <div className="mb-2 sm:mb-3 flex items-center gap-1.5 border-b-2 border-gray-100 pb-2 sm:pb-2.5">
                   <span className="h-2 w-2 sm:h-2.5 sm:w-2.5 rounded-full bg-[#ff6b6b]" />
                   <span className="h-2 w-2 sm:h-2.5 sm:w-2.5 rounded-full bg-[#ffd356]" />
                   <span className="h-2 w-2 sm:h-2.5 sm:w-2.5 rounded-full bg-[#39d5c8]" />
                 </div>
 
-                {/* 4 Feature Rounded Cards */}
-                <div className="grid grid-cols-2 gap-2.5 sm:gap-3.5">
+                {/* 4 Feature Cards (Compact on Mobile) */}
+                <div className="grid grid-cols-2 gap-2 sm:gap-3.5">
                   {programTabs[activeTab].cards.map((item, i) => (
                     <div
                       key={i}
                       className={cn(
-                        "flex flex-col items-center justify-center rounded-[16px] sm:rounded-[20px] border-2 border-[#171717]/15 p-3 sm:p-4 text-center transition-transform hover:scale-[1.02]",
+                        "flex flex-col items-center justify-center rounded-[12px] sm:rounded-[20px] border-2 border-[#171717]/15 p-2 sm:p-4 text-center transition-transform hover:scale-[1.02]",
                         item.bg
                       )}
                     >
-                      <div className="flex h-11 w-11 sm:h-14 sm:w-14 items-center justify-center rounded-full bg-white shadow-sm">
-                        <img src={item.asset} alt="" className="h-8 w-8 sm:h-10 sm:w-10 object-contain" />
+                      <div className="flex h-8 w-8 sm:h-13 sm:w-13 items-center justify-center rounded-full bg-white shadow-xs">
+                        <img src={item.asset} alt="" className="h-5 w-5 sm:h-8 sm:w-8 object-contain" />
                       </div>
-                      <p className="mt-2 text-[10px] sm:text-xs font-black uppercase text-[#171717]">
+                      <p className="mt-1 text-[9px] sm:text-xs font-black uppercase tracking-tight text-[#171717] leading-tight">
                         {item.title}
                       </p>
-                      <span className="mt-0.5 text-[9px] sm:text-[10px] font-bold leading-tight text-[#171717]/70">
+                      <span className="mt-0.5 text-[8px] sm:text-[10px] font-bold leading-tight text-[#171717]/70 line-clamp-2">
                         {item.subtitle}
                       </span>
                     </div>
                   ))}
                 </div>
 
-                {/* Dashed Stamp Badge (Overlapping Preview - Shadow removed) */}
+                {/* Dashed Stamp Badge (Overlapping Preview - Compact on Mobile) */}
                 <div
                   className={cn(
-                    "mt-4 inline-block sm:absolute sm:-bottom-5 sm:-left-5 sm:mt-0 z-20 rotate-[-8deg] sm:rotate-[-12deg] rounded-full border-[3px] sm:border-4 border-dashed border-[#171717] px-3.5 py-1.5 sm:px-4 sm:py-2 font-display text-xs sm:text-sm md:text-base uppercase tracking-wider text-[#171717]",
+                    "mt-2.5 inline-block sm:absolute sm:-bottom-5 sm:-left-5 sm:mt-0 z-20 rotate-[-4deg] sm:rotate-[-12deg] rounded-full border-2 sm:border-4 border-dashed border-[#171717] px-2.5 py-1 sm:px-4 sm:py-2 font-display text-[10px] sm:text-sm md:text-base uppercase tracking-wider text-[#171717]",
                     programTabs[activeTab].badgeColor
                   )}
                 >
@@ -862,8 +957,100 @@ export function LandingPage({ onOpenAuth, onNavigate }) {
         </div>
       </section>
 
-      {/* Waitlist Section */}
-      <section id="waitlist" className="grid-paper relative px-4 py-16 text-ink sm:px-8 sm:py-20 lg:px-12">
+      {/* FAQ Section */}
+      <section id="faq" className="relative overflow-hidden bg-[#242424] px-4 pt-4 pb-0 text-white sm:px-8 sm:pt-8 sm:pb-0 lg:px-12">
+        {/* Playful Looping Yellow Doodle Ribbon Line Accent */}
+        <svg
+          className="pointer-events-none absolute left-0 top-0 w-full text-[#ffd356] opacity-80 z-0 h-28 sm:h-32"
+          viewBox="0 0 1200 120"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="10"
+          strokeLinecap="round"
+        >
+          <path d="M -50 60 C 150 10, 250 110, 400 30 C 550 -40, 700 120, 900 40 C 1050 -20, 1150 70, 1300 30" />
+        </svg>
+
+        <div className="relative z-10 mx-auto max-w-6xl">
+          {/* Header Title */}
+          <div data-faq-title className="text-center mb-4 sm:mb-8">
+            <span data-faq-badge className="inline-flex items-center gap-1.5 rounded-full border-2 border-[#171717] bg-[#ffd356] px-4 py-1 text-xs font-black uppercase text-[#171717] shadow-sm mb-3">
+              <HelpCircle className="h-4 w-4" />
+              GOT QUESTIONS?
+            </span>
+            <h2 className="font-display text-5xl uppercase tracking-tight text-white sm:text-7xl md:text-8xl leading-none">
+              <span className="loop-title-word-wrap inline-block">
+                <span data-faq-title-word>FREQUENTLY</span>
+              </span>{" "}
+              <span className="loop-title-word-wrap inline-block">
+                <span data-faq-title-word>ASKED</span>
+              </span>{" "}
+              <span className="loop-title-word-wrap inline-block">
+                <span data-faq-title-word>QUESTIONS</span>
+              </span>
+            </h2>
+            <p data-faq-subheading className="mt-3 text-xs font-bold text-white/80 sm:text-base max-w-xl mx-auto">
+              Got doubts about StudyLoop? Here is everything you need to know about our features, accuracy, mobile support, and pricing.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-12 items-end">
+            
+            {/* Left Column: Frameless Mona Lisa Thinking Artwork Image (Large, Touch Bottom, No Shadow) */}
+            <div className="lg:col-span-5 flex justify-center items-end self-end">
+              <img
+                data-float
+                src="/hero-assets/faq_mona.png"
+                alt="StudyLoop Thinking Art"
+                className="w-full max-w-[320px] sm:max-w-[380px] lg:max-w-[420px] h-auto object-contain block align-bottom select-none"
+              />
+            </div>
+
+            {/* Right Column: Compact FAQ Marquee Ticker */}
+            <div className="lg:col-span-7 pb-6 sm:pb-8">
+              <div className={cn("faq-marquee-container py-1", openFaq !== null && "has-open-card")}>
+                <div className="faq-marquee-track">
+                  {[...faqs, ...faqs].map((faq, idx) => {
+                    const isOpen = openFaq === idx;
+                    return (
+                      <div
+                        key={`${faq.id}-${idx}`}
+                        className="faq-card rounded-[18px] border-3 border-[#171717] bg-white text-[#171717] shadow-[4px_4px_0_#171717] overflow-hidden transition-all duration-200"
+                      >
+                        <button
+                          type="button"
+                          onClick={() => toggleFaq(idx)}
+                          aria-expanded={isOpen}
+                          className="flex w-full items-center justify-between p-3.5 sm:p-4 text-left font-black uppercase tracking-tight gap-3 hover:bg-[#ffd356]/20 transition cursor-pointer select-none"
+                        >
+                          <span className="leading-snug flex-1 text-xs sm:text-sm">{faq.q}</span>
+                          <div className={cn(
+                            "flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border-2 border-[#171717] transition-transform duration-200 shadow-xs",
+                            isOpen ? "bg-[#ffd356] rotate-180" : "bg-[#39d5c8] hover:scale-105"
+                          )}>
+                            <ChevronDown className="h-4 w-4 text-[#171717]" />
+                          </div>
+                        </button>
+
+                        {isOpen && (
+                          <div className="border-t-2 border-[#171717]/15 bg-[#faf9f5] px-4 py-3.5 text-xs sm:text-sm font-semibold leading-relaxed text-[#171717]/90 animate-in fade-in slide-in-from-top-1 duration-150">
+                            {faq.a}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </section>
+
+      {/* Waitlist Section Wrapper (Seamless Grey Background for Rounded Corners) */}
+      <div className="bg-[#242424]">
+        <section id="waitlist" className="grid-paper relative rounded-t-[42px] sm:rounded-t-[54px] border-t-4 border-[#171717] px-4 py-16 text-ink sm:px-8 sm:py-24 lg:px-12">
         <div className="mx-auto max-w-4xl text-center">
           <img
             data-float
@@ -890,33 +1077,35 @@ export function LandingPage({ onOpenAuth, onNavigate }) {
             className="sticker hidden sm:block right-[6%] bottom-8 w-16 sm:right-[12%] sm:bottom-12 sm:w-28 filter drop-shadow-[6px_8px_0_rgba(0,0,0,0.18)]"
           />
 
-          <h2 className="loop-title font-display text-4xl uppercase sm:text-7xl md:text-8xl">
-            <span className="loop-title-word-wrap">
-              <span data-waitlist-title-word>Let&apos;s</span>
-            </span>{" "}
-            <span className="loop-title-word-wrap">
-              <span data-waitlist-title-word>unlock</span>
-            </span>{" "}
-            <span className="loop-title-word-wrap">
-              <span data-waitlist-title-word>your</span>
-            </span>{" "}
-            <span className="loop-title-word-wrap">
-              <span data-waitlist-title-word>potential</span>
-            </span>{" "}
-            <span className="loop-title-word-wrap">
-              <span data-waitlist-title-word>with</span>
-            </span>
-            <span className="mt-2 block w-full sm:mt-4">
-              <span data-waitlist-title-word className="inline-block w-full text-center">
+          <h2 className="loop-title font-display text-2xl uppercase tracking-tight text-center sm:text-7xl md:text-8xl leading-snug sm:leading-none">
+            <div className="flex flex-wrap justify-center items-center gap-x-2.5 sm:gap-x-4 gap-y-1.5 sm:gap-y-3 max-w-3xl mx-auto">
+              <span className="loop-title-word-wrap inline-block">
+                <span data-waitlist-title-word>Let&apos;s</span>
+              </span>
+              <span className="loop-title-word-wrap inline-block">
+                <span data-waitlist-title-word>unlock</span>
+              </span>
+              <span className="loop-title-word-wrap inline-block">
+                <span data-waitlist-title-word>your</span>
+              </span>
+              <span className="loop-title-word-wrap inline-block">
+                <span data-waitlist-title-word>potential</span>
+              </span>
+              <span className="loop-title-word-wrap inline-block">
+                <span data-waitlist-title-word>with</span>
+              </span>
+            </div>
+            <div className="mt-4 sm:mt-6 w-full flex justify-center">
+              <span data-waitlist-title-word className="inline-block max-w-[240px] sm:max-w-md w-full px-2">
                 <img
                   src="/hero-assets/logo.png"
                   alt="StudyLoop"
-                  className="mx-auto h-22 w-auto max-w-[92%] object-contain sm:h-32 md:h-40"
+                  className="mx-auto w-full h-auto max-h-16 sm:max-h-32 md:max-h-40 object-contain"
                 />
               </span>
-            </span>
+            </div>
           </h2>
-          <p data-waitlist-subheading className="mx-auto mt-4 max-w-2xl text-sm font-bold leading-relaxed text-ink/75 sm:text-base md:text-lg">
+          <p data-waitlist-subheading className="mx-auto mt-4 max-w-xl text-xs font-bold leading-relaxed text-ink/75 sm:text-base md:text-lg px-2">
             Join the early list for the study app that keeps your revision honest, cited, and tuned to your next exam.
           </p>
 
@@ -943,6 +1132,7 @@ export function LandingPage({ onOpenAuth, onNavigate }) {
           {submitted ? <p className="mt-4 text-xs sm:text-sm font-black text-ink">You&apos;re on the list. Tiny win, big momentum.</p> : null}
         </div>
       </section>
+    </div>
 
       {/* Footer */}
       <footer className="border-t-3 border-ink bg-[#171717] px-4 py-8 text-white sm:px-8 lg:px-12">
@@ -966,13 +1156,21 @@ export function LandingPage({ onOpenAuth, onNavigate }) {
             </a>
 
             <a
-              href="https://in.linkedin.com/in/study-loop-8408a5430"
+              href="https://www.linkedin.com/company/studyloopp/"
               target="_blank"
               rel="noopener noreferrer"
               className="group flex items-center gap-2 rounded-xl border-2 border-white/20 bg-white/10 px-4 py-2.5 text-xs font-black uppercase text-white hover:bg-[#0077b5] hover:border-white transition shadow-sm"
             >
               <Linkedin className="h-4 w-4 text-[#39d5c8] group-hover:text-white transition-colors" />
               <span>LinkedIn</span>
+            </a>
+
+            <a
+              href="mailto:studyloop770@gmail.com"
+              className="group flex items-center gap-2 rounded-xl border-2 border-white/20 bg-white/10 px-4 py-2.5 text-xs font-black uppercase text-white hover:bg-[#ea4335] hover:border-white transition shadow-sm"
+            >
+              <Mail className="h-4 w-4 text-[#ffd356] group-hover:text-white transition-colors" />
+              <span>Email</span>
             </a>
           </div>
         </div>

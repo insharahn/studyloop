@@ -8,10 +8,14 @@ import {
   Trash2,
   UploadCloud,
   AlertCircle,
+  AlertTriangle,
   ChevronDown,
-  Check
+  Check,
+  X
 } from "lucide-react";
 import gsap from "gsap";
+import { ToastContainer, toast as reactToast } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 import { api, apiConcepts } from "./api";
 import { cn } from "./utils";
 
@@ -23,6 +27,28 @@ export function UploadPage({ user, courseId, onNavigate }) {
   const [activeUploads, setActiveUploads] = useState([]);
   const [loading, setLoading] = useState(true);
   const [dropdownOpen, setDropdownOpen] = useState(false);
+
+  function showToast(message, type = "error") {
+    if (type === "error") {
+      reactToast.error(message, {
+        position: "top-right",
+        autoClose: 4500,
+        theme: "colored"
+      });
+    } else if (type === "warning") {
+      reactToast.warn(message, {
+        position: "top-right",
+        autoClose: 4500,
+        theme: "colored"
+      });
+    } else {
+      reactToast.success(message, {
+        position: "top-right",
+        autoClose: 4500,
+        theme: "colored"
+      });
+    }
+  }
 
   const fileInputRef = useRef(null);
   const dropZoneRef = useRef(null);
@@ -71,12 +97,27 @@ export function UploadPage({ user, courseId, onNavigate }) {
     setLoading(false);
   }
 
+  const MAX_FILE_SIZE_MB = 25;
+  const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
+
   // File Drop / Selection Handler
   async function handleFiles(files) {
-    const validFiles = Array.from(files).filter((f) => f.type === "application/pdf" || f.name.endsWith(".pdf"));
-    if (!validFiles.length) return;
+    const rawFiles = Array.from(files);
+    if (!rawFiles.length) return;
 
-    for (const file of validFiles) {
+    for (const file of rawFiles) {
+      // 1. File Format Validation
+      if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) {
+        showToast("Please upload a PDF file.", "error");
+        continue;
+      }
+
+      // 2. File Size Limit Validation (25MB)
+      if (file.size > MAX_FILE_SIZE_BYTES) {
+        showToast(`File exceeds ${MAX_FILE_SIZE_MB}MB limit.`, "warning");
+        continue;
+      }
+
       try {
         const initialUpload = await api.uploadDocument(selectedCourseId, file);
         const uploadItem = {
@@ -90,6 +131,7 @@ export function UploadPage({ user, courseId, onNavigate }) {
         pollStatus(uploadItem.doc_id, file.name);
       } catch (err) {
         console.error("Upload failed:", err);
+        showToast("Failed to process document.", "error");
         setActiveUploads((prev) => [
           {
             doc_id: "fail_" + Date.now(),
@@ -113,11 +155,6 @@ export function UploadPage({ user, courseId, onNavigate }) {
         if (res.status === "ready") {
           clearInterval(interval);
 
-          // Build concepts, THEN generate cards -- these used to fire at
-          // the same instant with no await and a silent .catch(() => {}),
-          // so generate-cards almost always ran against zero concepts
-          // (build-concepts is an LLM call that takes real time) and
-          // created zero cards, with no error ever surfacing anywhere.
           setActiveUploads((current) =>
             current.map((u) =>
               u.doc_id === docId ? { ...u, status: "generating", progress: 100 } : u
@@ -128,7 +165,7 @@ export function UploadPage({ user, courseId, onNavigate }) {
             const conceptsResult = await apiConcepts.buildConcepts(selectedCourseId);
             if (!conceptsResult?.concepts_created) {
               throw new Error(
-                "No concepts could be extracted from this PDF. Try a text-based lecture PDF (not a scan)."
+                "No concepts could be extracted from this PDF. Please ensure the PDF contains readable text."
               );
             }
             const cardsResult = await apiConcepts.generateCards(selectedCourseId);
@@ -136,8 +173,10 @@ export function UploadPage({ user, courseId, onNavigate }) {
               throw new Error("Concepts were found but no flashcards were generated. Try again in a moment.");
             }
             setActiveUploads((current) => current.filter((u) => u.doc_id !== docId));
+            showToast("Document uploaded successfully!", "success");
           } catch (err) {
             console.error("Concept/card generation failed:", err);
+            showToast("Failed to process document.", "error");
             setActiveUploads((current) =>
               current.map((u) =>
                 u.doc_id === docId
@@ -204,7 +243,9 @@ export function UploadPage({ user, courseId, onNavigate }) {
   }
 
   return (
-    <div className="min-h-screen bg-[#171717] px-4 pb-20 pt-6 text-white sm:px-8 lg:px-12">
+    <div className="relative min-h-screen bg-[#171717] px-4 pb-20 pt-6 text-white sm:px-8 lg:px-12">
+      <ToastContainer position="top-right" autoClose={4500} theme="colored" />
+
       <div className="mx-auto max-w-5xl">
         {/* Navigation / Header */}
         <div className="mb-8 flex flex-col justify-between gap-4 border-b-2 border-white/10 pb-6 sm:flex-row sm:items-center">
@@ -310,7 +351,7 @@ export function UploadPage({ user, courseId, onNavigate }) {
         {activeUploads.length > 0 && (
           <div className="mt-8">
             <h2 className="font-display text-2xl uppercase tracking-tight mb-3 text-[#39d5c8]">
-              Processing Ingestion Pipeline
+              Processing...
             </h2>
             <div className="space-y-3">
               {activeUploads.map((item) => (
@@ -352,7 +393,7 @@ export function UploadPage({ user, courseId, onNavigate }) {
         <div className="mt-10">
           <div className="mb-4 flex items-center justify-between">
             <h2 className="font-display text-2xl uppercase tracking-tight sm:text-3xl">
-              Indexed Documents ({documents.length})
+              Documents ({documents.length})
             </h2>
           </div>
 
@@ -364,7 +405,7 @@ export function UploadPage({ user, courseId, onNavigate }) {
             </div>
           ) : documents.length === 0 ? (
             <div className="rounded-[24px] border-2 border-white/10 bg-white/5 p-8 text-center text-xs font-bold text-white/50">
-              No documents indexed for this syllabus yet.
+              No documents uploaded for this syllabus yet.
             </div>
           ) : (
             <div className="space-y-3">
