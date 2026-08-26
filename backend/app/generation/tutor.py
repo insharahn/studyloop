@@ -3,6 +3,11 @@ Grounded tutor: answers a student's question using only retrieved chunks
 from their own course material, via Groq (Llama). Refuses when retrieval
 confidence is too low rather than guessing -- this refusal gate is the
 core differentiator, so it runs BEFORE any LLM call, not after.
+
+Falls back to a secondary Groq key if the primary is rate-limited. If
+both are exhausted, returns a clear "server is busy" message rather
+than a generic error -- this is a distinct failure mode from "not in
+your notes" and should read differently to the student.
 """
 
 from __future__ import annotations
@@ -12,24 +17,23 @@ import os
 import re
 from dataclasses import dataclass
 
-from openai import OpenAI
-
 from app.retrieval.dense import RetrievedChunk
+from app.generation.groq_client import call_groq_with_fallback
 
 logger = logging.getLogger(__name__)
 
 TUTOR_MODEL = "openai/gpt-oss-120b"
 CONFIDENCE_THRESHOLD = 0.35
 
-_client = OpenAI(
-    api_key=os.environ["GROQ_API_KEY"],
-    base_url="https://api.groq.com/openai/v1",
-)
-
 REFUSAL_TEMPLATE = (
     "I couldn't find anything about this in your uploaded notes for {course_name}. "
     "This might be outside what you've uploaded so far -- try adding more material, "
     "or rephrasing the question."
+)
+
+BUSY_MESSAGE = (
+    "The tutor is under heavy load right now and can't answer at the moment. "
+    "Please try again in a minute."
 )
 
 
@@ -70,23 +74,21 @@ def answer_doubt(
 
     prompt = _build_prompt(query, chunks)
 
-    try:
-        response = _client.chat.completions.create(
-            model=TUTOR_MODEL,
-            max_tokens=1000,
-            messages=[{"role": "user", "content": prompt}],
-        )
-        choice = response.choices[0]
-        raw_answer = choice.message.content
-        was_truncated = choice.finish_reason == "length"
-    except Exception as e:
-        logger.error("Tutor LLM call failed: %s", e)
+    choice = _call_with_fallback(prompt)
+    if choice is None:
+        # Both keys exhausted (or both failed for any reason) -- this is
+        # a distinct, honest "we're overloaded" state, not the confidence
+        # gate's "not in your notes" refusal. grounded=False either way
+        # since no real grounded answer was produced.
         return TutorAnswer(
-            answer="Something went wrong answering that -- please try again.",
+            answer=BUSY_MESSAGE,
             grounded=False,
             confidence=confidence,
             citations=[],
         )
+
+    raw_answer = choice.message.content
+    was_truncated = choice.finish_reason == "length"
 
     if was_truncated:
         raw_answer = _trim_to_last_sentence(raw_answer) + "\n\n*(Answer was long and got cut short -- ask a follow-up if you need the rest.)*"
@@ -100,18 +102,28 @@ def answer_doubt(
         citations=citations,
     )
 
+
+def _call_with_fallback(prompt: str):
+    response = call_groq_with_fallback(
+        model=TUTOR_MODEL,
+        max_tokens=1000,
+        messages=[{"role": "user", "content": prompt}],
+    )
+    return response.choices[0] if response else None
+
+
 def _trim_to_last_sentence(text: str) -> str:
     """
     Trims text back to the last complete sentence, so a truncated LLM
-    response ends cleanly (e.g. "...produces the final result.") rather
-    than mid-word or mid-list-item (e.g. "5. **Append-"). Falls back to
-    the original text if no sentence boundary is found at all.
+    response ends cleanly rather than mid-word or mid-list-item. Falls
+    back to the original text if no sentence boundary is found at all.
     """
     matches = list(re.finditer(r"[.!?](?:\s|$)", text))
     if not matches:
         return text
     last_end = matches[-1].end()
     return text[:last_end].rstrip()
+
 
 def _build_prompt(query: str, chunks: list[RetrievedChunk]) -> str:
     lines = [
@@ -137,8 +149,7 @@ def _extract_citations(
 ) -> tuple[str, list[Citation]]:
     """
     Finds [N] markers in the raw answer, maps them back to real chunks,
-    and drops any marker that doesn't correspond to a real chunk (e.g.
-    a hallucinated [9] when only 6 passages were given).
+    and drops any marker that doesn't correspond to a real chunk.
     """
     found_numbers = {int(n) for n in re.findall(r"\[(\d+)\]", raw_answer)}
 

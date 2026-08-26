@@ -10,12 +10,10 @@ from __future__ import annotations
 import json
 import time
 import logging
-import os
 import re
 
-from openai import OpenAI
-
 from app.db import pool
+from app.generation.groq_client import call_groq_with_fallback
 
 logger = logging.getLogger(__name__)
 
@@ -25,10 +23,6 @@ BATCH_SIZE = 20
 MIN_CONCEPTS = 15
 MAX_CONCEPTS = 40
 
-_client = OpenAI(
-    api_key=os.environ["GROQ_API_KEY"],
-    base_url="https://api.groq.com/openai/v1",
-)
 
 def build_concepts(course_id: str) -> dict:
     chunks = _sample_chunks(course_id)
@@ -50,6 +44,7 @@ def build_concepts(course_id: str) -> dict:
 
     concepts_created, edges_created = _write_to_db(course_id, deduped, acyclic_edges)
     return {"concepts_created": concepts_created, "edges_created": edges_created}
+
 
 def _sample_chunks(course_id: str) -> list[dict]:
     """
@@ -119,25 +114,26 @@ def _extract_concepts_batch(batch: list[dict]) -> list[dict]:
     )
     prompt = "\n".join(lines)
 
-    try:
-        response = _client.chat.completions.create(
-            model=CONCEPTS_MODEL,
-            max_tokens=1200,
-            reasoning_effort="low",
-            messages=[{"role": "user", "content": prompt}],
-        )
-        raw = response.choices[0].message.content
-        cleaned = _strip_fences(raw)
-        if not cleaned:
-            logger.warning("Concept extraction batch returned empty content")
-            return []
-        parsed = json.loads(cleaned)
-    except Exception as e:
-        logger.warning("Concept extraction batch failed, skipping: %s", e)
+    response = call_groq_with_fallback(
+        model=CONCEPTS_MODEL,
+        max_tokens=1200,
+        reasoning_effort="low",
+        messages=[{"role": "user", "content": prompt}],
+    )
+    if response is None:
+        logger.warning("Concept extraction batch failed on both Groq keys, skipping")
         return []
+
+    raw = response.choices[0].message.content
+    cleaned = _strip_fences(raw)
+    if not cleaned:
+        logger.warning("Concept extraction batch returned empty content")
+        return []
+
+    try:
         parsed = json.loads(cleaned)
     except Exception as e:
-        logger.warning("Prerequisite inference failed, returning no edges: %s", e)
+        logger.warning("Concept extraction batch failed to parse, skipping: %s", e)
         return []
 
     results = []
@@ -184,26 +180,30 @@ def _infer_prerequisites(concept_names: list[str]) -> list[tuple[str, str]]:
         '[{"prerequisite": "...", "concept": "..."}, ...]'
     )
 
-    try:
-        response = _client.chat.completions.create(
-            model=CONCEPTS_MODEL,
-            max_tokens=2000,
-            reasoning_effort="low",
-            messages=[{"role": "user", "content": prompt}],
+    response = call_groq_with_fallback(
+        model=CONCEPTS_MODEL,
+        max_tokens=2000,
+        reasoning_effort="low",
+        messages=[{"role": "user", "content": prompt}],
+    )
+    if response is None:
+        logger.warning("Prerequisite inference failed on both Groq keys, returning no edges")
+        return []
+
+    choice = response.choices[0]
+    raw = choice.message.content
+    cleaned = _strip_fences(raw)
+    if not cleaned:
+        logger.warning(
+            "Prerequisite inference returned empty content. finish_reason=%s",
+            choice.finish_reason,
         )
-        choice = response.choices[0]
-        raw = choice.message.content
-        cleaned = _strip_fences(raw)
-        if not cleaned:
-            logger.warning(
-                "Prerequisite inference returned empty content. "
-                "finish_reason=%s, usage=%s",
-                choice.finish_reason, response.usage,
-            )
-            return []
+        return []
+
+    try:
         parsed = json.loads(cleaned)
     except Exception as e:
-        logger.warning("Prerequisite inference failed, returning no edges: %s", e)
+        logger.warning("Prerequisite inference failed to parse, returning no edges: %s", e)
         return []
 
     name_set = set(concept_names)
@@ -220,9 +220,7 @@ def _drop_cyclic_edges(concept_names: list[str], edges: list[tuple[str, str]]) -
     """
     Adds edges one at a time, running a topological sort after each
     addition; any edge that would close a cycle is dropped rather than
-    added. Order-dependent (first-seen edges win over later ones that
-    would create a cycle), which is an acceptable tradeoff for keeping
-    this simple and deterministic.
+    added.
     """
     accepted: list[tuple[str, str]] = []
     graph: dict[str, set[str]] = {name: set() for name in concept_names}
@@ -230,7 +228,7 @@ def _drop_cyclic_edges(concept_names: list[str], edges: list[tuple[str, str]]) -
     for prereq, concept in edges:
         graph[prereq].add(concept)
         if _has_cycle(graph):
-            graph[prereq].discard(concept)  # revert, this edge closes a cycle
+            graph[prereq].discard(concept)
             logger.info("Dropped edge %s -> %s: would create a cycle", prereq, concept)
         else:
             accepted.append((prereq, concept))
@@ -260,13 +258,11 @@ def _write_to_db(course_id: str, concepts: list[dict], edges: list[tuple[str, st
     """
     Upserts concepts by (course_id, name) rather than delete-and-recreate --
     preserves existing concept IDs across re-runs so cards attached to
-    them (cards.concept_id has ON DELETE CASCADE) are never silently
-    destroyed by regenerating the concept list.
+    them are never silently destroyed by regenerating the concept list.
     """
     with pool.connection() as conn:
         with conn.transaction():
             name_to_id: dict[str, str] = {}
-            new_count = 0
 
             for c in concepts:
                 row = conn.execute(
@@ -278,17 +274,12 @@ def _write_to_db(course_id: str, concepts: list[dict], edges: list[tuple[str, st
                         description = excluded.description,
                         source_document_id = excluded.source_document_id,
                         source_page = excluded.source_page
-                    returning id, (xmax = 0) as was_inserted
+                    returning id
                     """,
                     (course_id, c["name"], c["description"], c["source_document_id"], c["source_page"]),
                 ).fetchone()
                 name_to_id[c["name"]] = str(row[0])
-                if row[1]:
-                    new_count += 1
 
-            # Prerequisite edges: clear and rewrite ONLY the edges (not
-            # the concepts themselves) -- edges have no cards attached to
-            # them, so this is safe to fully replace on every run.
             concept_ids = list(name_to_id.values())
             conn.execute(
                 "delete from concept_edges where concept_id = any(%s)",

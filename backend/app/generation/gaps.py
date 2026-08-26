@@ -14,19 +14,13 @@ import logging
 import os
 import re
 
-from openai import OpenAI
+from app.generation.groq_client import call_groq_with_fallback
 
 from app.db import pool
 
 logger = logging.getLogger(__name__)
 
 GAPS_MODEL = "openai/gpt-oss-120b"
-
-
-_client = OpenAI(
-    api_key=os.environ["GROQ_API_KEY"],
-    base_url="https://api.groq.com/openai/v1",
-)
 
 
 def log_gap_from_doubt(user_id: str, course_id: str, query: str) -> list[str]:
@@ -70,12 +64,15 @@ def _classify_touched(query: str, concepts: list[dict]) -> list[str]:
         'empty), no other text: ["...", ...]'
     )
 
-    response = _client.chat.completions.create(
+    response = call_groq_with_fallback(
         model=GAPS_MODEL,
         max_tokens=300,
         reasoning_effort="low",
         messages=[{"role": "user", "content": prompt}],
     )
+    if response is None:
+        logger.warning("Gap classification failed on both Groq keys, skipping")
+        return []
 
     raw = response.choices[0].message.content
     cleaned = re.sub(r"^```(?:json)?\s*|\s*```$", "", raw.strip(), flags=re.MULTILINE).strip()

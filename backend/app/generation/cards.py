@@ -20,7 +20,7 @@ import re
 import time
 from dataclasses import dataclass
 
-from openai import OpenAI
+from app.generation.groq_client import call_groq_with_fallback
 
 from app.db import pool
 from app.retrieval.dense import dense_search
@@ -45,12 +45,6 @@ class GeneratedCard:
     explanation: str
     source_document_id: str | None
     source_page: int | None
-
-
-_client = OpenAI(
-    api_key=os.environ["GROQ_API_KEY"],
-    base_url="https://api.groq.com/openai/v1",
-)
 
 
 def generate_cards(course_id: str, concept_ids: list[str] | None = None, per_concept: int = CARDS_PER_CONCEPT_DEFAULT) -> dict:
@@ -146,12 +140,15 @@ def _generate_cards_for_concept(concept: dict, chunks: list, siblings: list[str]
         '"answer": "...", "explanation": "..."}]'
     )
 
-    response = _client.chat.completions.create(
+    response = call_groq_with_fallback(
         model=CARDS_MODEL,
         max_tokens=1200,
         reasoning_effort="low",
         messages=[{"role": "user", "content": prompt}],
     )
+    if response is None:
+        logger.warning("Card generation failed on both Groq keys for concept '%s', skipping", concept["name"])
+        return []
 
     raw = response.choices[0].message.content
     cleaned = _strip_fences(raw)
@@ -162,7 +159,7 @@ def _generate_cards_for_concept(concept: dict, chunks: list, siblings: list[str]
         )
         return []
 
-    parsed = json.loads(cleaned)  # let a parse failure propagate to the outer try/except
+    parsed = json.loads(cleaned)
 
     source_doc = concept["source_document_id"]
     source_page = concept["source_page"]
