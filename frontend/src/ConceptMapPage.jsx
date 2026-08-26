@@ -231,27 +231,58 @@ export function ConceptMapPage({ courseId, onNavigate }) {
   useEffect(() => {
     async function loadData() {
       setLoading(true);
-      const isUUID = (str) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str || "");
       const courses = await api.getCourses();
-      const validPassedId = (courseId && isUUID(courseId) && courses.some((c) => c.id === courseId)) ? courseId : null;
-      const activeId = validPassedId || courses[0]?.id || "";
+      const matchedCourse = courses.find((c) => c.id === courseId) || courses[0];
+      const activeId = matchedCourse?.id || courseId || "";
       setActiveCourseId(activeId);
-      const currentCourse = courses.find((c) => c.id === activeId) || courses[0] || { name: "Course", code: "" };
 
       let docs = [];
       try {
-        if (activeId && isUUID(activeId)) {
+        if (activeId) {
           docs = await api.getDocuments(activeId);
         }
       } catch (err) {
         console.warn("Could not fetch documents:", err);
       }
-      const filename = docs[0]?.filename || `${currentCourse.name}_Lecture.pdf`;
+      const filename = docs[0]?.filename || `${matchedCourse?.name || "Course"}_Lecture.pdf`;
       setDocName(filename);
 
       try {
-        if (activeId && isUUID(activeId)) {
-          const fetchedConcepts = await apiConcepts.getConcepts(activeId);
+        if (activeId) {
+          let fetchedConcepts = await apiConcepts.getConcepts(activeId);
+          
+          // Sync node mastery & status with real review stats
+          try {
+            const pulseData = await apiStats.getPulse(activeId);
+            if (pulseData && Array.isArray(pulseData.concepts)) {
+              const pulseMap = {};
+              pulseData.concepts.forEach((pc) => {
+                pulseMap[pc.id] = pc;
+                pulseMap[pc.name] = pc;
+              });
+
+              fetchedConcepts = (fetchedConcepts || []).map((fc) => {
+                const matchedPulse = pulseMap[fc.id] || pulseMap[fc.name];
+                if (matchedPulse) {
+                  const clarity = matchedPulse.clarity_pct || 0;
+                  let status = "unseen";
+                  if (clarity >= 75) status = "solid";
+                  else if (clarity >= 40) status = "learning";
+                  else if (clarity > 0) status = "shaky";
+
+                  return {
+                    ...fc,
+                    mastery: matchedPulse.clarity_pct ? matchedPulse.clarity_pct / 100 : fc.mastery,
+                    status: status
+                  };
+                }
+                return fc;
+              });
+            }
+          } catch (pulseErr) {
+            console.warn("Pulse sync warning:", pulseErr);
+          }
+
           if (fetchedConcepts && fetchedConcepts.length > 0) {
             const graphData = buildGraphLayout(fetchedConcepts, filename);
             if (graphData && graphData.nodes.length > 0) {
@@ -338,28 +369,57 @@ export function ConceptMapPage({ courseId, onNavigate }) {
     setPan(clampPan(rawX, rawY));
   }
 
+  const isPanningRef = useRef(false);
+  const panStartRef = useRef({ x: 0, y: 0 });
+  const touchDistanceRef = useRef(null);
+
   function handleMouseUp() {
     setIsPanning(false);
+    isPanningRef.current = false;
   }
 
   function handleTouchStart(e) {
-    if (!e.touches || e.touches.length !== 1) return;
-    const touch = e.touches[0];
-    if (touch.target.closest("[data-node]") || touch.target.closest("[data-no-pan]")) return;
-    setIsPanning(true);
-    setPanStart({ x: touch.clientX - pan.x, y: touch.clientY - pan.y });
+    if (!e.touches) return;
+    if (e.touches.length === 1) {
+      const touch = e.touches[0];
+      if (touch.target.closest("[data-node]") || touch.target.closest("[data-no-pan]")) return;
+      isPanningRef.current = true;
+      setIsPanning(true);
+      panStartRef.current = { x: touch.clientX - pan.x, y: touch.clientY - pan.y };
+      touchDistanceRef.current = null;
+    } else if (e.touches.length === 2) {
+      isPanningRef.current = false;
+      setIsPanning(false);
+      const dist = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+      touchDistanceRef.current = dist;
+    }
   }
 
   function handleTouchMove(e) {
-    if (!isPanning || !e.touches || e.touches.length !== 1) return;
-    const touch = e.touches[0];
-    const rawX = touch.clientX - panStart.x;
-    const rawY = touch.clientY - panStart.y;
-    setPan(clampPan(rawX, rawY));
+    if (!e.touches) return;
+    if (e.touches.length === 1 && isPanningRef.current) {
+      const touch = e.touches[0];
+      const rawX = touch.clientX - panStartRef.current.x;
+      const rawY = touch.clientY - panStartRef.current.y;
+      setPan(clampPan(rawX, rawY));
+    } else if (e.touches.length === 2 && touchDistanceRef.current) {
+      const newDist = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+      const delta = (newDist - touchDistanceRef.current) * 0.004;
+      touchDistanceRef.current = newDist;
+      setZoom((z) => Math.min(2.0, Math.max(0.4, z + delta)));
+    }
   }
 
   function handleTouchEnd() {
+    isPanningRef.current = false;
     setIsPanning(false);
+    touchDistanceRef.current = null;
   }
 
   // Animate drawer entrance
@@ -406,11 +466,13 @@ export function ConceptMapPage({ courseId, onNavigate }) {
   return (
     <div className="flex h-screen flex-col bg-[#121212] text-white select-none overflow-hidden font-sans">
       {/* Top Header */}
-      <header className="z-30 flex h-16 shrink-0 items-center justify-between border-b-2 border-white/10 bg-[#171717] px-4 sm:px-8">
+      <header className="z-40 flex h-16 shrink-0 items-center justify-between border-b-2 border-white/10 bg-[#171717] px-4 sm:px-8 relative pointer-events-auto">
         <div className="flex items-center gap-3">
           <button
             onClick={() => onNavigate("dashboard")}
-            className="flex h-10 w-10 items-center justify-center rounded-xl border-2 border-white bg-white/10 text-white transition hover:bg-white hover:text-[#171717]"
+            className="relative z-50 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border-2 border-white bg-white/10 text-white transition hover:bg-white hover:text-[#171717] active:scale-95 pointer-events-auto"
+            data-no-pan
+            title="Back to Dashboard"
           >
             <ArrowLeft className="h-5 w-5" />
           </button>
@@ -418,7 +480,7 @@ export function ConceptMapPage({ courseId, onNavigate }) {
             <h1 className="font-display text-xl uppercase leading-none sm:text-2xl">
               Concept Map
             </h1>
-            <p className="text-[10px] font-bold text-[#39d5c8] uppercase tracking-wider">
+            <p className="text-[10px] font-bold text-[#39d5c8] uppercase tracking-wider hidden sm:block">
               Visual Prerequisite Knowledge Graph
             </p>
           </div>
@@ -490,7 +552,7 @@ export function ConceptMapPage({ courseId, onNavigate }) {
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
         className={cn(
-          "relative flex-1 overflow-hidden touch-pan-x touch-pan-y",
+          "relative flex-1 overflow-hidden touch-none",
           isPanning ? "cursor-grabbing" : "cursor-grab",
           "bg-[radial-gradient(circle_at_1px_1px,rgba(255,255,255,0.07)_1.5px,transparent_0)] [background-size:32px_32px]"
         )}
@@ -522,14 +584,15 @@ export function ConceptMapPage({ courseId, onNavigate }) {
         ) : (
           <div
             style={{
-              transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+              transform: `translate3d(${pan.x}px, ${pan.y}px, 0px) scale(${zoom})`,
               transformOrigin: "top left",
+              willChange: "transform",
               width: "1200px",
               minWidth: "1200px",
               maxWidth: "1200px",
               minHeight: `${Math.max(900, (nodes && nodes.length ? Math.max(...nodes.map((n) => n.y)) + 300 : 900))}px`
             }}
-            className="relative transition-transform duration-75"
+            className={cn("relative touch-none", isPanning ? "transition-none" : "transition-transform duration-100 ease-out")}
           >
             {/* Level Swimlanes */}
             <div className="pointer-events-none absolute inset-0 flex">

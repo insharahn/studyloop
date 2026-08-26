@@ -178,8 +178,11 @@ export function ReviewPage({ user, courseId, onNavigate }) {
 
   if (!queue) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#171717] text-white">
-        <p className="font-display text-2xl uppercase">Loading Exam Queue...</p>
+      <div className="flex min-h-screen flex-col items-center justify-center bg-[#171717] text-white gap-3">
+        <div className="flex h-12 w-12 items-center justify-center rounded-2xl border-3 border-[#171717] bg-[#ffd356] text-[#171717] shadow-hard animate-pulse">
+          <RotateCcw className="h-6 w-6" />
+        </div>
+        <p className="font-display text-2xl uppercase tracking-tight">Loading Quiz...</p>
       </div>
     );
   }
