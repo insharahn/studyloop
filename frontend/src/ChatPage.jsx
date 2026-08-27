@@ -15,22 +15,23 @@ import gsap from "gsap";
 import { apiReview } from "./api";
 import { cn } from "./utils";
 
+const DEFAULT_WELCOME_MESSAGE = {
+  id: "init",
+  role: "assistant",
+  content: "Ask any doubt. I will answer strictly from your uploaded slides with exact slide & page citations.",
+  grounded: true,
+  citations: []
+};
+
 export function ChatPage({ user, courseId, initialPrompt, onNavigate }) {
-  const [messages, setMessages] = useState([
-    {
-      id: "init",
-      role: "assistant",
-      content: "Ask any doubt. I will answer strictly from your uploaded slides with exact slide & page citations.",
-      grounded: true,
-      citations: []
-    }
-  ]);
+  const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [activeSnippet, setActiveSnippet] = useState(null);
   const messagesEndRef = useRef(null);
 
   const [sessionId, setSessionId] = useState(null);
+  const [sessionsLoaded, setSessionsLoaded] = useState(false);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -38,13 +39,52 @@ export function ChatPage({ user, courseId, initialPrompt, onNavigate }) {
 
   const sentPromptRef = useRef(null);
 
-  // Auto-send initial prompt if navigated with a doubt question
   useEffect(() => {
-    if (initialPrompt && initialPrompt.trim() && sentPromptRef.current !== initialPrompt) {
+    async function restoreLastSession() {
+      try {
+        const { sessions } = await apiReview.getChatSessions(courseId);
+        if (sessions && sessions.length > 0) {
+          const mostRecent = sessions[0];
+          const { messages: pastMessages } = await apiReview.getChatSession(mostRecent.id);
+          if (pastMessages && pastMessages.length > 0) {
+            setMessages(
+              pastMessages.map((m) => ({
+                id: m.id,
+                role: m.role,
+                content: m.content,
+                grounded: m.grounded,
+                confidence: m.confidence,
+                citations: m.citations || []
+              }))
+            );
+            setSessionId(mostRecent.id);
+          } else {
+            setMessages([DEFAULT_WELCOME_MESSAGE]);
+          }
+        } else {
+          setMessages([DEFAULT_WELCOME_MESSAGE]);
+        }
+      } catch (err) {
+        console.warn("Could not restore chat history:", err.message);
+        setMessages([DEFAULT_WELCOME_MESSAGE]);
+      } finally {
+        setSessionsLoaded(true);
+      }
+    }
+    restoreLastSession();
+  }, [courseId]);
+
+  useEffect(() => {
+    if (
+      sessionsLoaded &&
+      initialPrompt &&
+      initialPrompt.trim() &&
+      sentPromptRef.current !== initialPrompt
+    ) {
       sentPromptRef.current = initialPrompt;
       sendChatPrompt(initialPrompt);
     }
-  }, [initialPrompt]);
+  }, [initialPrompt, sessionsLoaded]);
 
   async function sendChatPrompt(promptText) {
     if (!promptText || !promptText.trim()) return;
@@ -115,69 +155,89 @@ export function ChatPage({ user, courseId, initialPrompt, onNavigate }) {
 
       {/* Message Stream */}
       <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 max-w-4xl w-full mx-auto">
-        {messages.map((m) => {
-          const isUser = m.role === "user";
-
-          // Out of Syllabus Banner (grounded = false)
-          if (!isUser && m.grounded === false) {
-            return (
-              <div
-                key={m.id}
-                className="rounded-[22px] border-3 border-[#171717] bg-[#ff6b6b] p-4 text-[#171717] shadow-hard sm:p-5"
-              >
-                <div className="flex items-center gap-2 mb-1.5">
-                  <ShieldAlert className="h-5 w-5 text-[#171717]" />
-                  <span className="font-display text-lg uppercase tracking-tight">
-                    Not In Syllabus
-                  </span>
-                </div>
-                <p className="text-xs font-bold leading-relaxed sm:text-sm">{m.content}</p>
-              </div>
-            );
-          }
-
-          return (
-            <div key={m.id} className={cn("flex flex-col", isUser ? "items-end" : "items-start")}>
-              <div
-                className={cn(
-                  "max-w-[92%] sm:max-w-[80%] rounded-[22px] border-3 border-[#171717] p-4 text-xs sm:text-sm font-bold shadow-hard",
-                  isUser ? "bg-[#ffd356] text-[#171717]" : "bg-white text-[#171717]"
-                )}
-              >
-                <p className="whitespace-pre-wrap leading-relaxed">{m.content}</p>
-
-                {/* Citations Pill Bar */}
-                {m.citations && m.citations.length > 0 && (
-                  <div className="mt-3 border-t-2 border-black/10 pt-2.5">
-                    <span className="block text-[9px] font-black uppercase text-black/50 mb-1.5">
-                      Verified Citations:
-                    </span>
-                    <div className="flex flex-wrap gap-1.5">
-                      {m.citations.map((c, i) => (
-                        <button
-                          key={i}
-                          onClick={() => setActiveSnippet(c)}
-                          className="flex items-center gap-1 rounded-lg border-2 border-[#171717] bg-[#39d5c8] px-2.5 py-1 text-[10px] font-black uppercase text-[#171717] hover:bg-cyan-300 transition"
-                        >
-                          <FileText className="h-3 w-3" />
-                          Page {c.page} • {c.filename}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
+        {!sessionsLoaded ? (
+          <div className="space-y-4 animate-pulse">
+            <div className="flex items-start">
+              <div className="h-14 w-2/3 sm:w-1/2 rounded-[22px] border-3 border-[#171717]/40 bg-white/10" />
             </div>
-          );
-        })}
-
-        {loading && (
-          <div className="flex items-center gap-2 rounded-2xl border-2 border-white/20 bg-white/5 px-4 py-3 text-xs font-bold text-white/70 w-fit">
-            <Loader2 className="h-4 w-4 animate-spin text-[#39d5c8]" />
-            Retrieving chunks and checking syllabus confidence...
+            <div className="flex justify-end">
+              <div className="h-10 w-1/3 sm:w-1/4 rounded-[22px] border-3 border-[#171717]/40 bg-white/10" />
+            </div>
+            <div className="flex items-start">
+              <div className="h-16 w-3/4 sm:w-2/3 rounded-[22px] border-3 border-[#171717]/40 bg-white/10" />
+            </div>
+            <div className="flex items-center gap-2 text-[10px] font-black uppercase text-white/40 pt-1">
+              <Loader2 className="h-3.5 w-3.5 animate-spin text-[#39d5c8]" />
+              Loading conversation history...
+            </div>
           </div>
+        ) : (
+          <>
+            {messages.map((m) => {
+              const isUser = m.role === "user";
+
+              // Out of Syllabus Banner (grounded = false)
+              if (!isUser && m.grounded === false) {
+                return (
+                  <div
+                    key={m.id}
+                    className="rounded-[22px] border-3 border-[#171717] bg-[#ff6b6b] p-4 text-[#171717] shadow-hard sm:p-5"
+                  >
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <ShieldAlert className="h-5 w-5 text-[#171717]" />
+                      <span className="font-display text-lg uppercase tracking-tight">
+                        Not In Syllabus
+                      </span>
+                    </div>
+                    <p className="text-xs font-bold leading-relaxed sm:text-sm">{m.content}</p>
+                  </div>
+                );
+              }
+
+              return (
+                <div key={m.id} className={cn("flex flex-col", isUser ? "items-end" : "items-start")}>
+                  <div
+                    className={cn(
+                      "max-w-[92%] sm:max-w-[80%] rounded-[22px] border-3 border-[#171717] p-4 text-xs sm:text-sm font-bold shadow-hard",
+                      isUser ? "bg-[#ffd356] text-[#171717]" : "bg-white text-[#171717]"
+                    )}
+                  >
+                    <p className="whitespace-pre-wrap leading-relaxed">{m.content}</p>
+
+                    {/* Citations Pill Bar */}
+                    {m.citations && m.citations.length > 0 && (
+                      <div className="mt-3 border-t-2 border-black/10 pt-2.5">
+                        <span className="block text-[9px] font-black uppercase text-black/50 mb-1.5">
+                          Verified Citations:
+                        </span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {m.citations.map((c, i) => (
+                            <button
+                              key={i}
+                              onClick={() => setActiveSnippet(c)}
+                              className="flex items-center gap-1 rounded-lg border-2 border-[#171717] bg-[#39d5c8] px-2.5 py-1 text-[10px] font-black uppercase text-[#171717] hover:bg-cyan-300 transition"
+                            >
+                              <FileText className="h-3 w-3" />
+                              Page {c.page} • {c.filename}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+
+            {loading && (
+              <div className="flex items-center gap-2 rounded-2xl border-2 border-white/20 bg-white/5 px-4 py-3 text-xs font-bold text-white/70 w-fit">
+                <Loader2 className="h-4 w-4 animate-spin text-[#39d5c8]" />
+                Retrieving chunks and checking syllabus confidence...
+              </div>
+            )}
+            <div ref={messagesEndRef} />
+          </>
         )}
-        <div ref={messagesEndRef} />
       </div>
 
       {/* Snippet Preview Drawer / Modal */}
