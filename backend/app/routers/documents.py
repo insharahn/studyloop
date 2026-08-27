@@ -21,6 +21,8 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
 STORAGE_BUCKET = "documents"
 
+MAX_UPLOAD_SIZE_MB = 15
+
 
 def _is_uuid(val: str) -> bool:
     try:
@@ -46,6 +48,12 @@ async def upload_document(
         raise HTTPException(status_code=404, detail="Course not found")
 
     file_bytes = await file.read()
+    if len(file_bytes) > MAX_UPLOAD_SIZE_MB * 1024 * 1024:
+        raise HTTPException(
+            status_code=413,
+            detail=f"File too large (max {MAX_UPLOAD_SIZE_MB}MB). Please try again.",
+        )
+        
     file_hash = hashlib.sha256(file_bytes).hexdigest()
 
     # Reject duplicate within the same course

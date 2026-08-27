@@ -27,6 +27,7 @@ export function UploadPage({ user, courseId, onNavigate }) {
   const [activeUploads, setActiveUploads] = useState([]);
   const [loading, setLoading] = useState(true);
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const hasNoCourses = !loading && courses.length === 0;
 
   function showToast(message, type = "error") {
     if (type === "error") {
@@ -105,43 +106,50 @@ export function UploadPage({ user, courseId, onNavigate }) {
     const rawFiles = Array.from(files);
     if (!rawFiles.length) return;
 
+    if (!selectedCourseId) {
+      showToast("Please create a course before uploading notes.", "error");
+      return;
+    }
+
     for (const file of rawFiles) {
-      // 1. File Format Validation
       if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) {
         showToast("Please upload a PDF file.", "error");
         continue;
       }
-
-      // 2. File Size Limit Validation (25MB)
       if (file.size > MAX_FILE_SIZE_BYTES) {
         showToast(`File exceeds ${MAX_FILE_SIZE_MB}MB limit.`, "warning");
         continue;
       }
 
+      // Show feedback immediately, before the network request even starts
+      const tempId = "uploading_" + Date.now() + "_" + file.name;
+      setActiveUploads((prev) => [
+        { doc_id: tempId, filename: file.name, progress: 5, status: "uploading" },
+        ...prev,
+      ]);
+
       try {
         const initialUpload = await api.uploadDocument(selectedCourseId, file);
-        const uploadItem = {
-          doc_id: initialUpload.doc_id,
-          filename: file.name,
-          progress: 15,
-          status: "processing"
-        };
 
-        setActiveUploads((prev) => [uploadItem, ...prev]);
-        pollStatus(uploadItem.doc_id, file.name);
+        // Swap the temporary placeholder for the real doc_id once the POST resolves
+        setActiveUploads((prev) =>
+          prev.map((u) =>
+            u.doc_id === tempId
+              ? { doc_id: initialUpload.doc_id, filename: file.name, progress: 15, status: "processing" }
+              : u
+          )
+        );
+        pollStatus(initialUpload.doc_id, file.name);
       } catch (err) {
         console.error("Upload failed:", err);
         showToast("Failed to process document.", "error");
-        setActiveUploads((prev) => [
-          {
-            doc_id: "fail_" + Date.now(),
-            filename: file.name,
-            progress: 0,
-            status: "failed",
-            error: err.message || "Upload failed"
-          },
-          ...prev
-        ]);
+        setActiveUploads((prev) =>
+          prev.map((u) =>
+            u.doc_id === tempId
+              ? { ...u, status: "failed", error: err.message || "Upload failed" }
+              : u
+          )
+        );
       }
     }
   }
@@ -304,48 +312,65 @@ export function UploadPage({ user, courseId, onNavigate }) {
         </div>
 
         {/* Drag & Drop Zone */}
-        <div
-          ref={dropZoneRef}
-          onDragOver={(e) => {
-            e.preventDefault();
-            setIsDragging(true);
-          }}
-          onDragLeave={() => setIsDragging(false)}
-          onDrop={(e) => {
-            e.preventDefault();
-            setIsDragging(false);
-            handleFiles(e.dataTransfer.files);
-          }}
-          onClick={() => fileInputRef.current?.click()}
-          className={cn(
-            "relative flex cursor-pointer flex-col items-center justify-center rounded-[32px] border-4 border-dashed p-8 text-center transition-all sm:p-12",
-            isDragging
-              ? "scale-[1.01] border-[#39d5c8] bg-[#39d5c8]/10"
-              : "border-white/20 bg-white/5 hover:border-white/40 hover:bg-white/10"
-          )}
-        >
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".pdf"
-            multiple
-            className="hidden"
-            onChange={(e) => handleFiles(e.target.files)}
-          />
-
-          <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl border-3 border-[#171717] bg-[#ffd356] text-[#171717] shadow-hard">
-            <UploadCloud className="h-8 w-8" />
+        {hasNoCourses ? (
+          <div className="flex flex-col items-center justify-center rounded-[32px] border-4 border-dashed border-white/20 bg-white/5 p-8 text-center sm:p-12">
+            <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl border-3 border-[#171717] bg-[#ffd356] text-[#171717] shadow-hard">
+              <UploadCloud className="h-8 w-8" />
+            </div>
+            <h3 className="font-display text-2xl uppercase tracking-tight sm:text-3xl">
+              No courses yet
+            </h3>
+            <p className="mt-1 text-xs font-bold text-white/60">
+              You need to create a course before you can upload lecture notes.
+            </p>
+            <button
+              onClick={() => onNavigate("dashboard")}
+              className="mt-4 rounded-full border-2 border-white bg-white/10 px-5 py-2 text-[11px] font-black uppercase tracking-wider text-white transition hover:bg-white hover:text-[#171717]"
+            >
+              Go to Dashboard to Add a Course
+            </button>
           </div>
-          <h3 className="font-display text-2xl uppercase tracking-tight sm:text-3xl">
-            Drop your slides or notes here
-          </h3>
-          <p className="mt-1 text-xs font-bold text-white/60">
-            Supports PDF lecture decks, hand-written notes, and dense handouts.
-          </p>
-          <span className="mt-4 rounded-full border-2 border-white bg-white/10 px-4 py-1.5 text-[11px] font-black uppercase tracking-wider text-white">
-            Browse Local Files
-          </span>
-        </div>
+        ) : (
+          <div
+            ref={dropZoneRef}
+            onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+            onDragLeave={() => setIsDragging(false)}
+            onDrop={(e) => {
+              e.preventDefault();
+              setIsDragging(false);
+              handleFiles(e.dataTransfer.files);
+            }}
+            onClick={() => fileInputRef.current?.click()}
+            className={cn(
+              "relative flex cursor-pointer flex-col items-center justify-center rounded-[32px] border-4 border-dashed p-8 text-center transition-all sm:p-12",
+              isDragging
+                ? "scale-[1.01] border-[#39d5c8] bg-[#39d5c8]/10"
+                : "border-white/20 bg-white/5 hover:border-white/40 hover:bg-white/10"
+            )}
+          >
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".pdf"
+              multiple
+              className="hidden"
+              onChange={(e) => handleFiles(e.target.files)}
+            />
+
+            <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl border-3 border-[#171717] bg-[#ffd356] text-[#171717] shadow-hard">
+              <UploadCloud className="h-8 w-8" />
+            </div>
+            <h3 className="font-display text-2xl uppercase tracking-tight sm:text-3xl">
+              Drop your slides or notes here
+            </h3>
+            <p className="mt-1 text-xs font-bold text-white/60">
+              Supports PDF lecture decks, hand-written notes, and dense handouts.
+            </p>
+            <span className="mt-4 rounded-full border-2 border-white bg-white/10 px-4 py-1.5 text-[11px] font-black uppercase tracking-wider text-white">
+              Browse Local Files
+            </span>
+          </div>
+        )}
 
         {/* Active Processing Section */}
         {activeUploads.length > 0 && (
@@ -368,10 +393,12 @@ export function UploadPage({ user, courseId, onNavigate }) {
                     </div>
                     <span className="rounded-full bg-[#39d5c8] px-2.5 py-0.5 text-[10px] font-black text-[#171717]">
                       {item.status === "generating"
-                        ? "Generating flashcards..."
-                        : item.status === "failed"
-                        ? "Failed"
-                        : `${item.progress}%`}
+                      ? "Generating flashcards..."
+                      : item.status === "uploading"
+                      ? "Uploading..."
+                      : item.status === "failed"
+                      ? "Failed"
+                      : `${item.progress}%`}
                     </span>
                   </div>
                   <div className="h-2.5 w-full overflow-hidden rounded-full border-2 border-[#171717] bg-white/20">

@@ -29,13 +29,9 @@ _supabase: Client = create_client(
     os.environ["SUPABASE_SERVICE_KEY"],
 )
 
+CHUNK_BATCH_SIZE = 15  # process and write chunks in groups, not all-at-once
 
 async def ingest(document_id: str) -> None:
-    """
-    Runs the full ingestion pipeline for one document. Never raises —
-    all failures are caught and written to documents.status/error so
-    the frontend's polling loop always sees a terminal state.
-    """
     tmp_path: str | None = None
     try:
         storage_path, course_id = _fetch_document_meta(document_id)
@@ -52,11 +48,18 @@ async def ingest(document_id: str) -> None:
             return
         _update_status(document_id, status="processing", progress=40)
 
-        vectors = embed_documents([c.content for c in chunks])
-        gc.collect()
-        _update_status(document_id, status="processing", progress=80)
+        # Clear existing chunks once, up front, before the incremental writes
+        with pool.connection() as conn:
+            conn.execute("delete from chunks where document_id = %s", (document_id,))
 
-        _write_chunks(document_id, course_id, chunks, vectors)
+        for i in range(0, len(chunks), CHUNK_BATCH_SIZE):
+            batch = chunks[i:i + CHUNK_BATCH_SIZE]
+            vectors = embed_documents([c.content for c in batch])
+            _write_chunk_batch(document_id, course_id, batch, vectors)
+            del vectors
+            gc.collect()
+
+        _update_status(document_id, status="processing", progress=80)
         _update_status(
             document_id,
             status="ready",
@@ -100,10 +103,9 @@ def _fetch_document_meta(document_id: str) -> tuple[str, str]:
     return row[0], row[1]
 
 
-def _write_chunks(document_id: str, course_id: str, chunks, vectors) -> None:
+def _write_chunk_batch(document_id: str, course_id: str, chunks, vectors) -> None:
     with pool.connection() as conn:
         with conn.transaction():
-            conn.execute("delete from chunks where document_id = %s", (document_id,))
             conn.cursor().executemany(
                 """
                 insert into chunks
