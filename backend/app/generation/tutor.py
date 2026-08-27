@@ -131,7 +131,8 @@ def _build_prompt(query: str, chunks: list[RetrievedChunk]) -> str:
         "Do not use any outside knowledge. If the passages don't fully answer "
         "the question, say what's missing rather than filling gaps yourself.",
         "",
-        "Cite passages inline using their number in brackets, e.g. [1], "
+        "Cite passages inline using their number in plain square brackets "
+        "exactly like this: [1] -- not full-width or stylized brackets -- "
         "right after the claim they support.",
         "",
         "Passages:",
@@ -151,8 +152,9 @@ def _extract_citations(
     Finds [N] markers in the raw answer, maps them back to real chunks,
     and drops any marker that doesn't correspond to a real chunk.
     """
-    found_numbers = {int(n) for n in re.findall(r"\[(\d+)\]", raw_answer)}
-
+    found_numbers = {
+        int(n) for n in re.findall(r"[\[【](\d+)[\]】]", raw_answer)
+    }
     citations = []
     seen_chunk_ids = set()
     for n in sorted(found_numbers):
