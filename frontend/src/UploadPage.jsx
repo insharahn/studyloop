@@ -364,7 +364,7 @@ export function UploadPage({ user, courseId, onNavigate }) {
               Drop your slides or notes here
             </h3>
             <p className="mt-1 text-xs font-bold text-white/60">
-              Supports PDF lecture decks, hand-written notes, and dense handouts.
+              Supports PDF-only lecture decks, typed notes, and dense handouts.
             </p>
             <span className="mt-4 rounded-full border-2 border-white bg-white/10 px-4 py-1.5 text-[11px] font-black uppercase tracking-wider text-white">
               Browse Local Files

@@ -6,6 +6,7 @@ import {
   ChevronRight,
   Flame,
   GraduationCap,
+  Layers,
   LogOut,
   MessageSquare,
   Network,
@@ -557,6 +558,20 @@ export function Dashboard({ user, onNavigate }) {
                       >
                         <FileText className="h-3.5 w-3.5" />
                         Report
+                      </button>
+                      <button
+                        onClick={() => onNavigate("sources", course.id)}
+                        className="flex items-center justify-center gap-1.5 rounded-xl border-2 border-[#171717] bg-white/80 px-3 py-2 text-xs font-black uppercase text-[#171717] transition hover:bg-white"
+                      >
+                        <BookOpen className="h-3.5 w-3.5" />
+                        Sources
+                      </button>
+                      <button
+                        onClick={() => onNavigate("cards", course.id)}
+                        className="flex items-center justify-center gap-1.5 rounded-xl border-2 border-[#171717] bg-white/80 px-3 py-2 text-xs font-black uppercase text-[#171717] transition hover:bg-white"
+                      >
+                        <Layers className="h-3.5 w-3.5" />
+                        Cards
                       </button>
                     </div>
                   )}

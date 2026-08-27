@@ -124,6 +124,31 @@ def list_course_documents(course_id: str, user_id: str = Depends(get_current_use
         ]
     }
 
+@router.get("/documents/{doc_id}/view")
+def get_document_view_url(doc_id: str, user_id: str = Depends(get_current_user)):
+    if not _is_uuid(doc_id):
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    doc_result = supabase.table("documents").select("*").eq("id", doc_id).execute()
+    if not doc_result.data:
+        raise HTTPException(status_code=404, detail="Document not found")
+    doc = doc_result.data[0]
+
+    # Ownership check via the parent course -- documents has no user_id column itself.
+    course = supabase.table("courses").select("id").eq("id", doc["course_id"]).eq("user_id", user_id).execute()
+    if not course.data:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    storage_path = doc.get("storage_path")
+    if not storage_path:
+        raise HTTPException(status_code=404, detail="File not available")
+
+    signed = supabase.storage.from_(STORAGE_BUCKET).create_signed_url(storage_path, 3600)
+    signed_url = signed.get("signedURL") or signed.get("signedUrl") or signed.get("signed_url")
+    if not signed_url:
+        raise HTTPException(status_code=500, detail="Could not generate file URL")
+
+    return {"doc_id": doc_id, "filename": doc["filename"], "url": signed_url, "expires_in": 3600}
 
 @router.delete("/documents/{doc_id}")
 def delete_document(doc_id: str, user_id: str = Depends(get_current_user)):

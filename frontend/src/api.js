@@ -482,6 +482,21 @@ export const mockConcepts = [
   }
 ];
 
+export const apiDocuments = {
+  listCourseDocuments: async (courseId) => {
+    return request(`/courses/${courseId}/documents`);
+  },
+  getDocumentViewUrl: async (docId) => {
+    return request(`/documents/${docId}/view`);
+  }
+};
+
+export const apiCards = {
+  listCourseCards: async (courseId) => {
+    return request(`/courses/${courseId}/cards`);
+  }
+};
+
 export const apiConcepts = {
   buildConcepts: async (courseId) => {
     return request(`/courses/${courseId}/build-concepts`, {

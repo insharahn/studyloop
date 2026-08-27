@@ -9,6 +9,8 @@ import { ReviewPage } from "./ReviewPage";
 import { ConceptMapPage } from "./ConceptMapPage";
 import { ClassPulsePage } from "./ClassPulsePage";
 import { auth, consumeOAuthRedirect, fetchCurrentUser, getStoredUser } from "./api";
+import { SourcesPanel } from "./SourcesPanel";
+import { CardLibrary } from "./CardLibrary";
 
 export default function App() {
   const [user, setUser] = useState(null);
@@ -135,6 +137,20 @@ export default function App() {
 
       {currentView === "pulse" && (
         <ClassPulsePage
+          courseId={activeCourseId}
+          onNavigate={handleNavigate}
+        />
+      )}
+
+      {currentView === "sources" && (
+        <SourcesPanel
+          courseId={activeCourseId}
+          onNavigate={handleNavigate}
+        />
+      )}
+
+      {currentView === "cards" && (
+        <CardLibrary
           courseId={activeCourseId}
           onNavigate={handleNavigate}
         />

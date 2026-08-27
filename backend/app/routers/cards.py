@@ -33,3 +33,37 @@ def _verify_course_ownership(course_id: str, user_id: str) -> None:
         ).fetchone()
     if not row:
         raise HTTPException(status_code=404, detail="Course not found")
+    
+@router.get("/courses/{course_id}/cards")
+def list_course_cards(course_id: str, user_id: str = Depends(get_current_user)):
+    _verify_course_ownership(course_id, user_id)
+    with pool.connection() as conn:
+        rows = conn.execute(
+            """
+            select c.id, c.type, c.question, c.options, c.answer, c.explanation,
+                   c.source_document_id, c.source_page, co.id as concept_id, co.name as concept_name
+            from cards c
+            left join concepts co on co.id = c.concept_id
+            where c.course_id = %s
+            order by co.name, c.id
+            """,
+            (course_id,),
+        ).fetchall()
+
+    return {
+        "cards": [
+            {
+                "card_id": str(r[0]),
+                "type": r[1],
+                "question": r[2],
+                "options": r[3],
+                "answer": r[4],
+                "explanation": r[5],
+                "source_document_id": str(r[6]) if r[6] else None,
+                "source_page": r[7],
+                "concept_id": str(r[8]) if r[8] else None,
+                "concept_name": r[9] or "General",
+            }
+            for r in rows
+        ]
+    }
