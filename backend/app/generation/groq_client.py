@@ -12,7 +12,7 @@ from openai import OpenAI, RateLimitError
 
 logger = logging.getLogger(__name__)
 
-_KEY_ENV_VARS = ["GROQ_API_KEY", "GROQ_API_KEY_BACKUP", "GROQ_API_KEY_BACKUP2", "GROQ_API_KEY_BACKUP3"]
+_KEY_ENV_VARS = ["GROQ_API_KEY", "GROQ_API_KEY_BACKUP", "GROQ_API_KEY_BACKUP2", "GROQ_API_KEY_BACKUP3", "GROQ_API_KEY_BACKUP4", "GROQ_API_KEY_BACKUP5"]
 
 _clients = [
     OpenAI(api_key=os.environ[var], base_url="https://api.groq.com/openai/v1")
