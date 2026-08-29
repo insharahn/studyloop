@@ -23,10 +23,36 @@ def create_course(payload: dict, user_id: str = Depends(get_current_user)):
     if not name:
         raise HTTPException(status_code=422, detail="name is required")
 
+    name_clean = name.strip()
+    code_clean = (payload.get("code") or "").strip() or None
+
+    # Defense-in-depth against duplicate submissions (double-clicked
+    # create button, retried request, etc.) -- if this user already has
+    # a course with the same name (case-insensitive) and code, return
+    # that one instead of creating a near-identical duplicate row.
+    existing = (
+        supabase.table("courses")
+        .select("*")
+        .eq("user_id", user_id)
+        .ilike("name", name_clean)
+        .execute()
+    )
+    for c in existing.data or []:
+        existing_code = (c.get("code") or "").strip() or None
+        if existing_code == code_clean:
+            return {
+                "id": c["id"],
+                "name": c["name"],
+                "code": c["code"],
+                "exam_date": c["exam_date"],
+                "doc_count": 0,
+                "mastery_pct": 0,
+            }
+
     row = {
         "user_id": user_id,
-        "name": name,
-        "code": payload.get("code"),
+        "name": name_clean,
+        "code": code_clean,
         "exam_date": payload.get("exam_date"),
     }
     result = supabase.table("courses").insert(row).execute()

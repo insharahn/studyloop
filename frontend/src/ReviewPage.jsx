@@ -41,6 +41,7 @@ export function ReviewPage({ user, courseId, onNavigate }) {
   const [courseStats, setCourseStats] = useState(DEFAULT_STATS);
   const cardRef = useRef(null);
   const [clozeInput, setClozeInput] = useState("");
+  const submittingRef = useRef(false);
 
   useEffect(() => {
     async function load() {
@@ -78,7 +79,8 @@ export function ReviewPage({ user, courseId, onNavigate }) {
   const currentCard = queue?.cards?.[currentIndex];
 
   async function handleOptionSelect(idx) {
-    if (submitted || !currentCard) return;
+    if (submitted || !currentCard || submittingRef.current) return;
+    submittingRef.current = true;
     setSelectedOption(idx);
     const elapsed = Date.now() - startTime;
 
@@ -122,13 +124,15 @@ export function ReviewPage({ user, courseId, onNavigate }) {
         next_due: new Date().toISOString(),
         new_mastery: isCorrect ? 0.8 : 0.2
       });
+    } finally {
+      setSubmitted(true);
+      submittingRef.current = false;
     }
-
-    setSubmitted(true);
   }
 
   async function handleClozeSubmit() {
-    if (submitted || !currentCard || !clozeInput.trim()) return;
+    if (submitted || !currentCard || !clozeInput.trim() || submittingRef.current) return;
+    submittingRef.current = true;
     const elapsed = Date.now() - startTime;
 
     const cardAnswer = currentCard.answer || "";
@@ -159,8 +163,10 @@ export function ReviewPage({ user, courseId, onNavigate }) {
         next_due: new Date().toISOString(),
         new_mastery: isCorrect ? 0.8 : 0.2
       });
+    } finally {
+      setSubmitted(true);
+      submittingRef.current = false;
     }
-    setSubmitted(true);
   }
 
   function handleNext() {

@@ -241,6 +241,7 @@ export function Dashboard({ user, onNavigate }) {
   const [newCourseName, setNewCourseName] = useState("");
   const [newCourseCode, setNewCourseCode] = useState("");
   const [newExamDate, setNewExamDate] = useState("");
+  const [isCreatingCourse, setIsCreatingCourse] = useState(false);
 
   async function handleDeleteCourse(courseId, e) {
     e.stopPropagation();
@@ -298,38 +299,43 @@ export function Dashboard({ user, onNavigate }) {
 
   async function handleCreateCourse(e) {
     e.preventDefault();
-    if (!newCourseName) return;
+    if (!newCourseName || isCreatingCourse) return;
 
     if (newExamDate && newExamDate < minDateStr) {
       alert("Please select today or a future date for the exam.");
       return;
     }
 
-    const created = await api.createCourse({
-      name: newCourseName,
-      code: newCourseCode || undefined,
-      exam_date: newExamDate || undefined
-    });
+    setIsCreatingCourse(true);
+    try {
+      const created = await api.createCourse({
+        name: newCourseName,
+        code: newCourseCode || undefined,
+        exam_date: newExamDate || undefined
+      });
 
-    const newCourseObj = {
-      ...created,
-      doc_count: 0,
-      card_count: 0,
-      due_today: 0,
-      mastery_pct: 0
-    };
+      const newCourseObj = {
+        ...created,
+        doc_count: 0,
+        card_count: 0,
+        due_today: 0,
+        mastery_pct: 0
+      };
 
-    setCourses((prev) => {
-      const updated = [...prev, newCourseObj];
-      try {
-        localStorage.setItem("studyloop_cached_courses", JSON.stringify(updated));
-      } catch {}
-      return updated;
-    });
-    setShowAddModal(false);
-    setNewCourseName("");
-    setNewCourseCode("");
-    setNewExamDate("");
+      setCourses((prev) => {
+        const updated = [...prev, newCourseObj];
+        try {
+          localStorage.setItem("studyloop_cached_courses", JSON.stringify(updated));
+        } catch {}
+        return updated;
+      });
+      setShowAddModal(false);
+      setNewCourseName("");
+      setNewCourseCode("");
+      setNewExamDate("");
+    } finally {
+      setIsCreatingCourse(false);
+    }
   }
 
   const displayName =
@@ -631,9 +637,10 @@ export function Dashboard({ user, onNavigate }) {
 
               <button
                 type="submit"
-                className="mt-3 flex min-h-12 w-full items-center justify-center gap-1.5 rounded-xl border-2 border-[#171717] bg-[#39d5c8] text-xs font-black uppercase text-[#171717] shadow-hard transition hover:bg-[#2fc4b7] cursor-pointer"
+                disabled={isCreatingCourse}
+                className="mt-3 flex min-h-12 w-full items-center justify-center gap-1.5 rounded-xl border-2 border-[#171717] bg-[#39d5c8] text-xs font-black uppercase text-[#171717] shadow-hard transition hover:bg-[#2fc4b7] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Create Course & Plan
+                {isCreatingCourse ? "Creating..." : "Create Course & Plan"}
                 <ChevronRight className="h-4 w-4" />
               </button>
             </form>

@@ -123,15 +123,22 @@ def review_submit(payload: dict, user_id: str = Depends(get_current_user)):
         raise HTTPException(status_code=404, detail="Card not found")
     card = card_result.data[0]
 
-    # Get or create the user's card state
+    # Get or create the user's card state -- upsert on (user_id, card_id)
+    # instead of select-then-insert, so a rapid double-submit (e.g. a
+    # double-fired click event on touch devices) can't hit a unique-
+    # constraint violation and 500 the whole request.
     state_result = supabase.table("card_states").select("*").eq("user_id", user_id).eq("card_id", card_id).execute()
     if state_result.data:
         existing_state = state_result.data[0]
     else:
-        existing_state = init_card_state()
-        existing_state["user_id"] = user_id
-        existing_state["card_id"] = card_id
-        insert_result = supabase.table("card_states").insert(existing_state).execute()
+        new_row = init_card_state()
+        new_row["user_id"] = user_id
+        new_row["card_id"] = card_id
+        insert_result = (
+            supabase.table("card_states")
+            .upsert(new_row, on_conflict="user_id,card_id")
+            .execute()
+        )
         existing_state = insert_result.data[0]
 
     new_state = advance_card_state(existing_state, grade)
